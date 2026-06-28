@@ -1,0 +1,15 @@
+{
+  "name": "pi-coding-master",
+  "version": "0.2.8",
+  "description": "Living AI agent extension for pi-coding-agent",
+  "license": "MIT",
+  "os": ["darwin", "linux"],
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.79.10"
+  },
+  "scripts": {
+    "postinstall": "bash deploy/install.sh"
+  },
+  "files": ["core/", "deploy/", "README.md"]
+}

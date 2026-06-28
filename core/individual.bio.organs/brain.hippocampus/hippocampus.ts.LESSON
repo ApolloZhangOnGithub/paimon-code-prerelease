@@ -1,0 +1,22 @@
+# hippocampus.ts — LESSONS
+
+## 2026-06-16 海马体编码死循环——指数自激，烧出 424 个实例 + 2.8M context
+
+**症状**：潜意识反复预警(8+次)：海马体每个新实例都从 context.md **第 1 行**开始读，编码的第一条永远是"pi-coding-master 系统架构"，work_memory 全是重复。现场坐实：某 person 的 context.md 涨到 **2.8M / 47890 行**，`.data/hippocampus-sessions` 累积 **424 个 session**（每个即生即死 <30s）。连带把主意识顶到记忆 **120%**、反复强制归档(-758KB/-614KB)、深度 sleep 整合不完、主意识秒级崩溃重启、mouth"从头开始"念。
+
+**根因（两层）**：
+1. **offset 靠模型自觉 = 形同虚设**。gen_work_mem 提示词写了"读 work_memory 找上次时间戳、只处理之后的新内容"，但这要模型每轮自己定位——它做不到/不做，于是每轮从头读整个 context.md，把同样的东西反复编码。
+2. **正反馈自激**：海马体编码 → work_memory 膨胀 → 主意识快照含 work_memory → 主意识 context 变大 → 写回 context.md → 海马体下轮读到更多 → 指数增长。最后 context.md 大到一读就爆窗口 → 海马体报错退出 → bash `while true` 立刻重启全新实例 → 又从第 1 行开始 → 424 个即生即死。
+
+**修复**：把"只读增量"从**提示词靠自觉**改成**launcher 代码强制**（hippocampus.ts 生成的 bash）：
+- 维护一个 **byte offset 文件** `.data/.hc-offset`（存在文件里 → 重启也不丢）。
+- 每轮只 `tail -c +offset` 截出 context.md 的**新增段**写进 `.hc-new-slice.md`，喂给海马体；提示词同步改成"只读 .hc-new-slice.md，绝不读整个 context.md"。
+- **没有(够多)新内容就不启动编码**（sleep 30 再看）——掐断空轮自激 + 省钱 + 不刷 session。
+- 首次启动把 offset 设到 context.md 当前末尾 → 自动跳过已有的 2.8M 垃圾，从"现在"往后编码。
+- context.md 变短(重启清理)→ offset 自动归零。
+
+**教训 / 下次怎么避免**：
+- **凡是"跨进程/跨重启要记住进度"的状态，绝不能靠提示词让模型自己记——必须落到代码里的持久化 offset/游标**。模型每次重启是全新的，"找上次到哪了"这种事它做不可靠。
+- **警惕反馈环**：一个子系统的输出会不会重新流回它自己的输入？海马体编码 → 进快照 → 进 context → 海马体再读，就是典型自激。设计任何"读 A 写 B"的后台编码器，先问"B 会不会又变成 A 的一部分"。
+- **"自愈重启"会放大 bug**：bash `while true` 重启在正常时是兜底，但当单轮必然失败(读爆窗口)时，它把一个 bug 变成 424 倍的雪崩。重启循环要配合"失败原因不消除就别盲目重启"或"每轮代价受限(只读增量)"。
+- 排查记忆膨胀，先看 `.data/hippocampus-sessions` 的 session 数和 context.md 大小——数量异常 = 编码器在 crash-loop。

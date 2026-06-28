@@ -1,0 +1,13 @@
+[2026-06-12 15:14:18] edited (auto-logged, no messageDescription)
+[2026-06-12 15:14:18] fix: register read_conscious tool in RPC subprocess (was missing after refactor, subconscious could only speak via aware but couldn't read main session history)
+[2026-06-12 16:22:37] edited (auto-logged, no messageDescription)
+[2026-06-12 16:22:42] edited (auto-logged, no messageDescription)
+[2026-06-12 16:22:50] edited (auto-logged, no messageDescription)
+[2026-06-15] fix: aware 显示不全/丢失（by Claude Code）
+  ① 渲染器正则 /^\[(...)\]\s*(.*)/  →  /^\[(...)\]\s*([\s\S]*)$/
+     —— .* 不匹配换行，多行 thought 被截成只剩第一行（这是"aware 没显示全"的根因）。
+  ② aware watcher 只消费"完整行"(以 \n 结尾)，末尾写了一半的 JSON 行留到下次事件再处理；
+     原来半截行 parse 失败被跳过、offset 却已推过 → 那条 aware 彻底丢失。现已防住。
+  也内联了 getPrompt("subconscious.observe")（去掉 prompt.ts 中间层）+ 级联看门狗（见 subconscious.ts.CHANGELOG）。
+[2026-06-19] 消息包裹转义：thought 内容中的 ---[/ 闭合标签被转义，防止包裹提前闭合
+[2026-06-19] 潜意识消息缩进对齐：paddingX 0→1，和工具调用卡片的缩进一致

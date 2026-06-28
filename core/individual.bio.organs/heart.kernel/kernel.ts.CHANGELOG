@@ -1,0 +1,13 @@
+[2026-06-15] created + 多次修改, by Claude Code
+- 创建 bios 装配内核：读 rna.json，把每个非 future func 的 default(pi) 表达到同一 pi 上；提供 /bios /mode 命令。
+- REGISTRY 指向各 func 真正带 default(pi) 的文件（body.heart/index、fileactions.js、hippocampus.js、bioclock.js、
+  predrafting/index、subconscious/index），不再要纯转发的空壳 index。
+- 一度误加 brain.memory 后又撤掉（memory 是 tag 不是 func；memory.ts 归 brain.hippocampus，由 hippocampus.ts registerMemory）。
+- session_start 设 process.title = pi-coding-master:<role>:<id>（角色从 session 文件路径推出、模型改不了 → 不可伪造），
+  ps/pgrep/pkill 可按角色精确定位，杀进程不再误伤工作进程。
+- default(pi) 最前面接入 installBudgetGuard(pi)（余额硬闸）。
+[2026-06-15 21:15:04] edited (auto-logged, no messageDescription)
+[2026-06-15 21:15:16] edited (auto-logged, no messageDescription)
+[2026-06-15 21:15:36] edited (auto-logged, no messageDescription)
+[2026-06-16 05:07:44] edited (auto-logged, no messageDescription)
+[2026-06-16 05:07:49] edited (auto-logged, no messageDescription)

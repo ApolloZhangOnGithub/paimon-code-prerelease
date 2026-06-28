@@ -1,0 +1,12 @@
+[2026-06-15] created（追踪本次重构），by Claude Code
+- 成为 func 唯一入口：把原 index.ts 的 default(pi)（session/agent_start/shutdown 装配）合并进来，
+  index.ts 作废删除。kernel 现在 import 本文件（brain.hippocampus/hippocampus.js）。
+- default(pi) 加 registerMemory(pi)：把主意识记忆系统接上（之前 memory 被错当独立 func/孤儿，从没加载）。
+  memory 是 tag 不是 func —— 记忆机能本就属于海马体这个 func。
+- prompt 内联：createHippocampus 里 HIPPOCAMPUS_PROMPT 改成 getPrompt("hippocampus.gen_work_mem")，
+  删掉中间层 prompt.ts / hippocampus.dna.ts。
+
+[2026-06-15 续] 加级联看门狗（by Claude Code）
+- hc 启动脚本加 MAIN_PID=主意识 pid + 后台子进程轮询 kill -0；主意识进程一退出 → 自动 tmux kill-session
+  把本 hc 实例连 tmux 一起关掉（循环顶也查一次）。解决"主程序死了 hc 还自启自跑、孤儿常驻烧钱"。
+- ⚠️ 当前正在跑的旧孤儿用的是没看门狗的旧脚本，需手动 tmux kill-session 清掉；之后由新 main spawn 出来的才带看门狗。

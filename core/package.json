@@ -1,0 +1,35 @@
+{
+  "type": "module",
+  "//": "路径别名总表(唯一真相源)。所有跨模块 import 用 #别名,文件随便移——只改这里这一行。Node 原生 imports 字段,运行时解析,不用打包器。",
+  "imports": {
+    "#messages": "./individual.bio.organs/blood.runtime/messages.ts",
+    "#paths": "./god.pi.mod/paths.ts",
+    "#kernel": "./individual.bio.organs/heart.kernel/kernel.ts",
+    "#runtime": "./individual.bio.organs/blood.runtime/runtime.ts",
+    "#sh": "./individual.bio.organs/hands.main/main.ts",
+    "#transpiler": "./individual.bio.gene/dna.transpiler/transpiler.ts",
+    "#devdoc": "./god.agent.capability/hands.dev.writeissue/issue.ts",
+    "#watcher": "./god.agent.capability/hands.files.changewatcher/watcher.ts",
+    "#budget": "./god.pi.mod/tui.mods.footer.budget/budget_guard.ts",
+    "#blockrender": "./god.pi.mod/tui.mods.blockrender/blockrender.js",
+    "#heart": "./individual.bio.organs/heart.main/main.ts",
+    "#heart-sc": "./individual.bio.organs/brain.senses.subconscious/subconscious.ts",
+    "#phone": "./technology.phone/system.kernel/kernel.ts",
+    "#fileactions": "./individual.bio.organs/hands.fileactions/fileactions.ts",
+    "#sensitiveactions": "./individual.bio.organs/hands.sensitive/sensitive.ts",
+    "#hippocampus": "./individual.bio.organs/brain.hippocampus/hippocampus.ts",
+    "#amygdala": "./individual.bio.organs/brain.amygdala/amygdala.ts",
+    "#drafting": "./individual.bio.organs/brain.prefrontal.drafting/main.ts",
+    "#bioclock": "./individual.bio.organs/brain.senses.bioclock/bioclock.ts",
+    "#subconscious": "./individual.bio.organs/brain.senses.subconscious/subconscious.ts",
+    "#ear": "./individual.bio.organs/ears.listen/listen.ts",
+    "#mouth": "./individual.bio.organs/mouth.speak/speak.ts",
+    "#terminal": "./god.pi.mod/tui.variants.userterminal/user_terminal.ts",
+    "#space": "./society.world/space/space.ts",
+    "#ubi": "./society.world/dollar.distribution.ubi/ubi.ts",
+    "#dollar": "./society.world/dollar.transaction/transaction.ts"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49"
+  }
+}

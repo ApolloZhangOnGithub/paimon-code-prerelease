@@ -1,0 +1,10 @@
+--- a/core/extensions/runner.js
++++ b/core/extensions/runner.js
+@@ -5,7 +5,6 @@
+ // Extension shortcuts compete with canonical keybinding ids from keybindings.json.
+ // Only editor-global shortcuts are reserved here. Picker-specific bindings are not.
+ const RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS = [
+-    "app.interrupt",
+     "app.clear",
+     "app.exit",
+     "app.suspend",

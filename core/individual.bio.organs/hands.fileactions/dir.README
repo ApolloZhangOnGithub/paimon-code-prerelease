@@ -1,0 +1,13 @@
+# fileactions 目录规则
+
+## 禁止操作
+- rm / rm -rf: 永不允许。文件只能 mv 成 .REMOVED
+- 直接 write .CHANGELOG: 用 edit 追加
+
+## 新增规则
+- 加规则改 FILE_RULES.json，不改代码
+- 新 coded 块必须在 promotor.dna 引用
+
+## 目录内文件
+- fileactions.ts: 引擎，不改具体规则
+- FILE_RULES.json: 所有规则定义

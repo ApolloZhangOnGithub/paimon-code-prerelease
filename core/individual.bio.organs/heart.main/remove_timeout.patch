@@ -1,0 +1,110 @@
+--- /tmp/pi-orig/package/dist/core/tools/bash.js	1985-10-26 16:15:00
++++ /opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/dist/core/tools/bash.js	2026-06-20 02:02:35
+@@ -13,8 +13,8 @@
+ import { wrapToolDefinition } from "./tool-definition-wrapper.js";
+ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "./truncate.js";
+ const bashSchema = Type.Object({
+-    command: Type.String({ messageDescription: "Bash command to execute" }),
+-    timeout: Type.Optional(Type.Number({ messageDescription: "Timeout in seconds (optional, no default timeout)" })),
++    command: Type.String({ messageDescription: "BASH command to execute" }),
++
+ });
+ /**
+  * Create bash operations using pi's built-in local shell execution backend.
+@@ -97,7 +97,7 @@
+ }
+ const BASH_PREVIEW_LINES = 5;
+ const BASH_UPDATE_THROTTLE_MS = 100;
+-class BashResultRenderComponent extends Container {
++class BASHResultRenderComponent extends Container {
+     state = {
+         cachedWidth: undefined,
+         cachedLines: undefined,
+@@ -107,14 +107,14 @@
+ function formatDuration(ms) {
+     return `${(ms / 1000).toFixed(1)}s`;
+ }
+-function formatBashCall(args) {
++function formatBASHCall(args) {
+     const command = str(args?.command);
+     const timeout = args?.timeout;
+     const timeoutSuffix = timeout ? theme.fg("muted", ` (timeout ${timeout}s)`) : "";
+     const commandDisplay = command === null ? invalidArgText(theme) : command ? command : theme.fg("toolOutput", "...");
+-    return theme.fg("toolTitle", theme.bold(`$ ${commandDisplay}`)) + timeoutSuffix;
++                return theme.fg("toolTitle", "● " + theme.bold("Bash")) + " " + theme.fg("text", command) + timeoutSuffix;
+ }
+-function rebuildBashResultRenderComponent(component, result, options, showImages, startedAt, endedAt) {
++function rebuildBASHResultRenderComponent(component, result, options, showImages, startedAt, endedAt) {
+     const state = component.state;
+     component.clear();
+     let output = getTextOutput(result, showImages).trim();
+@@ -131,8 +131,8 @@
+             .split("\n")
+             .map((line) => theme.fg("toolOutput", line))
+             .join("\n");
+-        if (options.expanded) {
+-            component.addChild(new Text(`\n${styledOutput}`, 0, 0));
++                if (options.expanded) {
++            component.addChild(new Text(styledOutput, 2, 0));
+         }
+         else {
+             component.addChild({
+@@ -146,9 +146,9 @@
+                     if (state.cachedSkipped && state.cachedSkipped > 0) {
+                         const hint = theme.fg("muted", `... (${state.cachedSkipped} earlier lines,`) +
+                             ` ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`;
+-                        return ["", truncateToWidth(hint, width, "..."), ...(state.cachedLines ?? [])];
++                        return [truncateToWidth(hint, width, "..."), ...(state.cachedLines ?? []).map(l => "  " + l)];
+                     }
+-                    return ["", ...(state.cachedLines ?? [])];
++                    return [...(state.cachedLines ?? []).map(l => "  " + l)];
+                 },
+                 invalidate: () => {
+                     state.cachedWidth = undefined;
+@@ -173,11 +173,7 @@
+         }
+         component.addChild(new Text(`\n${theme.fg("warning", `[${warnings.join(". ")}]`)}`, 0, 0));
+     }
+-    if (startedAt !== undefined) {
+-        const label = options.isPartial ? "Elapsed" : "Took";
+-        const endTime = endedAt ?? Date.now();
+-        component.addChild(new Text(`\n${theme.fg("muted", `${label} ${formatDuration(endTime - startedAt)}`)}`, 0, 0));
+-    }
++    // pi-coding-master: 去掉 "Took/Elapsed Xs" —— 结果行的时间戳 [时:分:秒 +Xs] 已经显示了耗时，这行是重复的（用户嫌）。
+ }
+ export function createBashToolDefinition(cwd, options) {
+     const ops = options?.operations ?? createLocalBashOperations({ shellPath: options?.shellPath });
+@@ -186,10 +182,11 @@
+     return {
+         name: "bash",
+         label: "bash",
+-        messageDescription: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.`,
++        messageDescription: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. For long commands use run() tool.`,
+         promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
+         parameters: bashSchema,
+-        async execute(_toolCallId, { command, timeout }, signal, onUpdate, _ctx) {
++        async execute(_toolCallId, { command }, signal, onUpdate, _ctx) {
++            const timeout = undefined;
+             const resolvedCommand = commandPrefix ? `${commandPrefix}\n${command}` : command;
+             const spawnContext = resolveSpawnContext(resolvedCommand, cwd, spawnHook);
+             const output = new OutputAccumulator({ tempFilePrefix: "pi-bash" });
+@@ -309,7 +306,7 @@
+                 state.endedAt = undefined;
+             }
+             const text = context.lastComponent ?? new Text("", 0, 0);
+-            text.setText(formatBashCall(args));
++            text.setText(formatBASHCall(args));
+             return text;
+         },
+         renderResult(result, options, _theme, context) {
+@@ -324,8 +321,8 @@
+                     state.interval = undefined;
+                 }
+             }
+-            const component = context.lastComponent ?? new BashResultRenderComponent();
+-            rebuildBashResultRenderComponent(component, result, options, context.showImages, state.startedAt, state.endedAt);
++            const component = context.lastComponent ?? new BASHResultRenderComponent();
++            rebuildBASHResultRenderComponent(component, result, options, context.showImages, state.startedAt, state.endedAt);
+             component.invalidate();
+             return component;
+         },

@@ -1,0 +1,108 @@
+#!/bin/bash
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--experimental-transform-types"
+# 自愈型海马体 launcher（自动生成）。带 offset：每轮只编码 context.md 自上次以来的【增量】，
+# 绝不从第 1 行重读整个文件 —— 这是根治"反复编码同样内容→work_mem 膨胀→快照变大→写回 context→
+# 下轮读到更多"指数自激死循环的关键。没有新内容就不启动编码，避免空轮烧钱+刷 session。
+SESSION_DIR={{SESSION_DIR}}
+dataDir={{DATA_DIR}}
+CTX="$dataDir/context.md"
+WM="$dataDir/work_memory.md"
+OFFSET_FILE="$dataDir/.hc-offset"
+NEW_SLICE="$dataDir/.hc-new-slice.md"
+MAIN_PID={{MAIN_PID}}
+# 级联看门狗：主意识进程一退出，就连本 tmux 一起关掉（防孤儿常驻烧钱）。
+( while kill -0 "$MAIN_PID" 2>/dev/null; do sleep 5; done; echo "[hc] 主意识已退出，自动关闭本实例。"; tmux kill-session -t {{TMUX_NAME}} 2>/dev/null ) &
+# 首次启动：把 offset 设到 context.md 当前末尾——从"现在"往后编码，不去啃已有历史（避免一上来就读爆窗口）。
+if [ ! -f "$OFFSET_FILE" ]; then stat -f%z "$CTX" 2>/dev/null > "$OFFSET_FILE" || echo 0 > "$OFFSET_FILE"; fi
+BACKOFF=15
+FAIL=0
+ERRLOG="$dataDir/hippocampus-err.log"
+while true; do
+  kill -0 "$MAIN_PID" 2>/dev/null || { echo "[hc] 主意识没了，退出。"; break; }
+  OFFSET=$(cat "$OFFSET_FILE" 2>/dev/null || echo 0)
+  SIZE=$(stat -f%z "$CTX" 2>/dev/null || echo 0)
+  # context.md 被重置/变短（如重启清理臃肿）→ offset 归零重来。
+  [ "$OFFSET" -gt "$SIZE" ] && OFFSET=0
+  NEW=$(( SIZE - OFFSET ))
+  if [ "$NEW" -lt 200 ]; then
+    # 没有（够多）新对话 → 不启动编码、不烧钱，歇 30s 再看。打断"空轮自激"的闸。
+    sleep 30
+    continue
+  fi
+  # 【封顶】每轮最多嚼 200KB。增量再大(如 offset 卡住攒到 1.4MB)，也只切一小段——
+  # 否则海马体一口吞这么大自己就崩、offset 永远不前进 → 越滚越大的死循环(就是反复崩溃的根)。
+  # 封顶后永远是可消化的一段，offset 按【实际处理量】稳步前进，增量大就分几轮快速追上。
+  CAP=200000
+  TAKE=$NEW; [ "$TAKE" -gt "$CAP" ] && TAKE=$CAP
+  tail -c +$(( OFFSET + 1 )) "$CTX" 2>/dev/null | head -c "$TAKE" > "$NEW_SLICE"
+  NEXT=$(( OFFSET + TAKE ))
+  # 【空切片闸】如果切片里全是空内容JSON（主意识崩溃时的心跳消息），跳过编码直接推进offset。
+  # 检测：过滤掉空内容/空文本行后，还有没有实质性内容。
+  EMPTY_SLICE=0
+  if [ -s "$NEW_SLICE" ]; then
+    # 去掉所有 content="" 或 text="" 的行，看还剩下什么
+    HAS_REAL=$(grep -v '"content":""' "$NEW_SLICE" 2>/dev/null | grep -v '"text":""' | grep -v '^{}$' | grep -v '^[[:space:]]*$' | head -1)
+    if [ -z "$HAS_REAL" ]; then
+      EMPTY_SLICE=1
+    fi
+  fi
+  if [ "$EMPTY_SLICE" -eq 1 ]; then
+    echo "$(date '+%F %T') hippocampus 跳过空切片（全是空内容消息），offset $OFFSET→$SIZE" >> "$ERRLOG"
+    echo "$SIZE" > "$OFFSET_FILE"
+    sleep 30
+    continue
+  fi
+  START=$(date +%s)
+  LOCKDIR="$dataDir/.memory-lock"
+  # 文件级互斥锁（mkdir 原子操作）：防 hc/sc/sl 并发写共享文件
+  LOCK_WAIT=0
+  while [ "$LOCK_WAIT" -lt 300 ]; do
+    if mkdir "$LOCKDIR" 2>/dev/null; then
+      # 拿到锁 → 写时间戳（供过期检测）
+      echo "{\"owner\":\"hc\",\"ts\":$(date +%s)000}" > "$LOCKDIR/stamp" 2>/dev/null
+      break
+    fi
+    # 锁被占用。检查是否过期（60s）。
+    if [ -f "$LOCKDIR/stamp" ]; then
+      LOCK_TS=$(cat "$LOCKDIR/stamp" 2>/dev/null | grep -o '"ts":[0-9]*' | grep -o '[0-9]*')
+      NOW_MS=$(date +%s)000
+      if [ -n "$LOCK_TS" ] && [ $(( NOW_MS - LOCK_TS )) -gt 60000 ]; then
+        # 过期锁 → 强拆
+        rm -f "$LOCKDIR/stamp" 2>/dev/null
+        rmdir "$LOCKDIR" 2>/dev/null
+        continue
+      fi
+    fi
+    LOCK_WAIT=$(( LOCK_WAIT + 1 ))
+    sleep 0.2
+  done
+  if [ "$LOCK_WAIT" -ge 300 ]; then
+    echo "[$(date '+%F %T')] hippocampus 无法获取文件锁（60s 超时），跳过本轮" >> "$ERRLOG"
+    sleep 30
+    continue
+  fi
+  echo "主意识自上次编码以来新产生的对话，已截出一段放在 $NEW_SLICE（增量的一段，封顶 $CAP 字节，不是全部）。读这个文件，消化、再反思，把有价值的结构化追加进 $WM。只处理这一段，绝对不要去读整个 context.md——那会重复编码、把记忆撑爆。完成后 wait(seconds=30)。" | /opt/homebrew/bin/pi --session-dir "$SESSION_DIR" 2>>"$ERRLOG"
+  CODE=$?;  # release lock (don't overwrite CODE)
+  rm -f "$LOCKDIR/stamp" 2>/dev/null
+  rmdir "$LOCKDIR" 2>/dev/null
+  # 编码成功 → offset 只推进【本轮实际处理的那段】(OFFSET+TAKE)，绝不直接跳到末尾。
+  if [ "$CODE" -eq 0 ]; then
+    echo "$NEXT" > "$OFFSET_FILE"
+    FAIL=0
+  else
+    FAIL=$(( FAIL + 1 ))
+    echo "[$(date '+%F %T')] hippocampus 编码失败 (code=$CODE, fail#$FAIL, offset=$OFFSET)" >> "$ERRLOG"
+    # 连续失败 5 次 → force 跳过这段坏内容（可能是 nap 归档后 offset 指向了无效区域）
+    if [ "$FAIL" -ge 5 ]; then
+      echo "[$(date '+%F %T')] hippocampus 连续失败5次，跳过坏段，offset $OFFSET→$SIZE" >> "$ERRLOG"
+      echo "$SIZE" > "$OFFSET_FILE"
+      FAIL=0
+    fi
+  fi
+  RAN=$(( $(date +%s) - START ))
+  if [ "$RAN" -ge 120 ]; then BACKOFF=15; else BACKOFF=$(( BACKOFF * 2 )); [ "$BACKOFF" -gt 300 ] && BACKOFF=300; fi
+  # 还有没追上的增量 → 不退避，马上接着嚼下一段，尽快追上。
+  [ "$CODE" -eq 0 ] && [ "$NEXT" -lt "$SIZE" ] && BACKOFF=1
+  echo "[$(date '+%F %T')] hippocampus 编码一段 (code=$CODE, ran $RAN s, offset $OFFSET→$NEXT / $SIZE) — 下轮 $BACKOFF s 后"
+  sleep "$BACKOFF"
+done

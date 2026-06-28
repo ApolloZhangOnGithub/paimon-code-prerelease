@@ -1,0 +1,55 @@
+--- a/modes/interactive/components/assistant-message.js
++++ b/modes/interactive/components/assistant-message.js
+@@ -64,28 +64,34 @@
+         for (let i = 0; i < message.content.length; i++) {
+             const content = message.content[i];
+             if (content.type === "text" && content.text.trim()) {
+-                // Assistant text messages with no background - trim the text
+-                // Set paddingY=0 to avoid extra spacing before tool executions
+-                this.contentContainer.addChild(new Markdown(content.text.trim(), 1, 0, this.markdownTheme));
++                // Assistant text messages — 一点 + 内容
++                // 多行时后续行缩进对齐（padding=2，对齐 ● 后的文字位置）
++                const lines = content.text.trim().split('\n');
++                const formatted = lines.map((l, i) => i === 0 ? "● " + l : "  " + l).join('\n');
++                this.contentContainer.addChild(new Markdown(formatted, 1, 0, this.markdownTheme));
+             }
+             else if (content.type === "thinking" && content.thinking.trim()) {
++                const viewMode = globalThis.__piViewMode || "full";
++                if (viewMode === "clean") continue;
+                 // Add spacing only when another visible assistant content block follows.
+                 // This avoids a superfluous blank line before separately-rendered tool execution blocks.
+                 const hasVisibleContentAfter = message.content
+                     .slice(i + 1)
+                     .some((c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()));
+-                if (this.hideThinkingBlock) {
++                if (viewMode === "fold" || this.hideThinkingBlock) {
+                     // Show static thinking label when hidden
+-                    this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", this.hiddenThinkingLabel)), 1, 0));
++                    this.contentContainer.addChild(new Text(theme.fg("thinkingText", this.hiddenThinkingLabel), 1, 0));
+                     if (hasVisibleContentAfter) {
+                         this.contentContainer.addChild(new Spacer(1));
+                     }
+                 }
+                 else {
+-                    // Thinking traces in thinkingText color, italic
+-                    this.contentContainer.addChild(new Markdown(content.thinking.trim(), 1, 0, this.markdownTheme, {
++                    // Thinking traces — 主题色点 + 思考内容
++                    // 多行时后续行缩进对齐
++                    const tLines = content.thinking.trim().split('\n');
++                    const tFormatted = tLines.map((l, i) => i === 0 ? theme.fg("thinkingText", "● ") + l : "  " + l).join('\n');
++                    this.contentContainer.addChild(new Markdown(tFormatted, 1, 0, this.markdownTheme, {
+                         color: (text) => theme.fg("thinkingText", text),
+-                        italic: true,
+                     }));
+                     if (hasVisibleContentAfter) {
+                         this.contentContainer.addChild(new Spacer(1));
+@@ -98,7 +104,8 @@
+         const hasToolCalls = message.content.some((c) => c.type === "toolCall");
+         this.hasToolCalls = hasToolCalls;
+         if (!hasToolCalls) {
+-            if (message.stopReason === "aborted") {
++            // pi-coding-master: suppress "Operation aborted" display. Steer/voice-driven aborts are normal in continuous agent mode.
++            if (false && message.stopReason === "aborted") {
+                 const abortMessage = message.errorMessage && message.errorMessage !== "Request was aborted"
+                     ? message.errorMessage
+                     : "Operation aborted";

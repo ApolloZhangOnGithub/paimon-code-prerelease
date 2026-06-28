@@ -1,0 +1,2 @@
+[2026-06-15] by Claude Code
+- PROMPT([COMMANDS]/run 工具说明) 改为 getPrompt("heart.commands")，从 coded.dna 取，不再硬编码。

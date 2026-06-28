@@ -1,0 +1,3 @@
+[2026-06-15] by Claude Code
+- 修坏的 import：registerAlwaysThink 从 "./always_think.js"（文件不存在）→ "./drafting.js"（真实文件）。
+  原来一直 import 失败，predrafting func 实际加载不了。

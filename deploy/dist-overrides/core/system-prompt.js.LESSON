@@ -1,0 +1,17 @@
+# system-prompt.js — LESSONS
+
+## 2026-06-16 启动一堆 `[Skills] lark-*` + `Current date:`，撑大 systemPrompt 还打爆缓存
+
+**症状**：每次起 pi，启动就刷一坨 `[Skills] lark-approval / lark-base / ...`（27 个 lark-* skill），还有一行 `Current date: ...`。这堆 skill 文本被塞进 systemPrompt，既是视觉噪音，更要命的是——它在 KV cache 的**稳定前缀**里占了一大段，pi-coding-master 根本用不到这些 skill（我们有自己的 funcs/器官），纯属污染。
+
+**根因**：pi 会自动从 `~/.pi/agent/skills` 发现 skill，然后在 `dist/core/system-prompt.js` 两处（:36 customPrompt 分支 / :113 主 prompt 分支）用 `formatSkillsForPrompt(skills)` 把它们注进 systemPrompt；同处还各注一行 `Current date: ${date}`（:39 / :116）。这俩都是 pi 的内置自动行为，没人请它，它自己往最金贵的缓存前缀里塞。
+
+**修复（两层，belt-and-suspenders）**：
+1. **断源**：把 `~/.pi/agent/skills` 整个 mv 成 `~/.pi/agent/skills.disabled`（可逆、不删）。skill 加载不到 → 启动 banner 没了、`skills.length===0`。
+2. **根除注入**：patch `system-prompt.js` 两处 `if (skills.length > 0)` 改成 `if (false && ...)`，并删掉两行 `Current date`。这样哪天 skills 目录又冒出来，也绝不会再注进 prompt。Current date 也去掉——pi-coding-master 有自己的时间感官（bioclock），不靠 pi 这行。
+3. **固化**：patched 文件 golden-copy 进 `deploy.ALL/dist-overrides/system-prompt.js`，install.sh 在版本守卫(`$VER == $PIN`)内 `cp` 回 `$PI_DIST/core/system-prompt.js`。npm 重装会冲掉 dist，这步把它还原。
+
+**教训 / 下次怎么避免**：
+- **pi 的 systemPrompt = KV cache 的稳定前缀**。任何"被自动塞进 systemPrompt 的东西"（skills、Current date、环境块、第三方注入）都得审两点：① 它进没进缓存前缀？② 它的值稳不稳（变一次缓存全废一次）？skill 那种大段文本 + Current date 那种每天变的值，都是典型雷。
+- **"按目录自动发现"的功能在 pi-coding-master 里默认是污染源**。pi 的 skill 机制是给通用 coding agent 的；我们这套有自己的器官系统，不要 pi 再自动塞东西进来。看到 pi 有这类"自动加载/自动注入"开关，默认全关。
+- 排查"启动多了一坨看不懂的东西"，先 `grep` dist 找到注入点（formatXxxForPrompt / `prompt +=`），别只在自己的 extension 里找——很多是 pi 本体干的。
