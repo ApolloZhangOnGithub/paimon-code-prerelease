@@ -1,0 +1,106 @@
+# Pikipedia — agent wiki 引擎
+
+agent 的知识管理系统。按 MediaWiki 的数据模型设计，TypeScript 实现，HTTP API。
+
+## 数据模型
+
+### Page（页面）
+
+```typescript
+interface Page {
+  title: string;          // 唯一标识，如 "Heart"
+  currentRevId: number;   // 当前版本号
+  created: string;        // ISO 时间
+  updated: string;
+}
+```
+
+### Revision（版本）
+
+每次编辑产生一个新 revision。旧版本永远不删。
+
+```typescript
+interface Revision {
+  id: number;             // 自增
+  pageTitle: string;
+  content: string;        // 完整页面内容（markdown）
+  author: string;         // 编辑者（agent id / "human"）
+  comment: string;        // 编辑说明
+  timestamp: string;      // ISO 时间
+  parentId: number | null; // 上一个版本的 id
+  size: number;           // content 字节数
+}
+```
+
+### 存储
+
+SQLite 单文件数据库。两张表：`pages` + `revisions`。
+
+```
+~/.pi/pikipedia/wiki.db
+```
+
+不用 MySQL——单机场景 SQLite 够用，零运维。
+
+## API
+
+HTTP 服务，端口 `:9225`。
+
+### 读
+- `GET /api/page/:title` — 读页面当前版本
+- `GET /api/page/:title/revisions` — 列所有版本
+- `GET /api/page/:title/revision/:id` — 读特定版本
+- `GET /api/diff/:fromId/:toId` — 两个版本的 diff
+- `GET /api/search?q=xxx` — 全文搜索
+- `GET /api/backlinks/:title` — 谁链到了这个页面
+- `GET /api/recent` — 最近修改
+- `GET /api/all` — 所有页面列表
+
+### 写
+- `POST /api/page/:title` — 创建/编辑页面
+  ```json
+  {"content": "markdown 内容", "author": "agent-6093b114", "comment": "更新记忆系统描述"}
+  ```
+- `POST /api/page/:title/revert/:revId` — 回滚到指定版本
+
+### 解析
+- `GET /api/page/:title/links` — 页面内的 `[[链接]]` 列表
+- `GET /api/page/:title/rendered` — 渲染后的内容（`[[链接]]` 转成实际链接）
+
+## 链接系统
+
+页面内容用 `[[Title]]` 语法链接其他页面。引擎：
+1. 写入时扫描所有 `[[...]]`，存到 `links` 表
+2. `backlinks` 查询反向查 `links` 表
+3. 红链（链到的页面不存在）在搜索和渲染时标记
+
+## Diff
+
+用 Node.js 的 `diff` 库（或自己实现行级 diff）。输出格式：
+
+```json
+{
+  "from": 3, "to": 4,
+  "changes": [
+    {"type": "remove", "line": 10, "content": "旧内容"},
+    {"type": "add", "line": 10, "content": "新内容"}
+  ]
+}
+```
+
+## 和 pi-coding-master 的关系
+
+- agent 通过 laptop 的 pikipedia app（前端）交互
+- 也可以通过 HTTP API 直接调用（tool 包装）
+- 现有的 `Docs/Wiki/*.md` 可以批量导入作为初始数据
+- 每个 agent 共享同一个 wiki 实例（知识是公共的，不是 per-person）
+
+## 实现顺序
+
+1. SQLite schema + 基础 CRUD（page + revision）
+2. HTTP API 服务
+3. `[[链接]]` 解析 + backlinks
+4. Diff
+5. 全文搜索
+6. 批量导入现有 wiki markdown
+7. laptop 前端 app

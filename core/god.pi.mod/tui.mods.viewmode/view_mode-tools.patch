@@ -1,0 +1,19 @@
+--- a/modes/interactive/components/tool-execution.js
++++ b/modes/interactive/components/tool-execution.js
+@@ -175,6 +175,16 @@
+         this.updateDisplay();
+     }
+     render(width) {
++        const viewMode = globalThis.__piViewMode || "full";
++        if (viewMode === "clean") return [];
++        if (viewMode === "fold" && !this.expanded) {
++            const args = this.args || {};
++            let summary = "● " + this.toolName.charAt(0).toUpperCase() + this.toolName.slice(1);
++            if (this.toolName === "bash" && args.command) summary += " ● " + String(args.command).split("\n")[0].slice(0, 80);
++            if (this.result && !this.isPartial) summary += this.result.isError ? " ✗" : " ✓";
++            else if (this.isPartial) summary += " …";
++            return [summary];
++        }
+         if (this.hideComponent) {
+             return [];
+         }

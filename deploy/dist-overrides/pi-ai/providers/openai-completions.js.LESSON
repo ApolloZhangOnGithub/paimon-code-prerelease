@@ -1,0 +1,15 @@
+# openai-completions.js (dist-override) — LESSONS
+
+## 2026-06-15 打断后必须告诉云端「别生成了」，否则隐形烧钱
+**症状**: 几分钟烧 ¥50；footer 显示的花费（¥5）远低于 deepseek 真账（¥50）。
+**根因**: 流式消费循环 `for await (const chunk of openaiStream)` 里【没有 signal 检查】。
+  打断（steer/abort）后客户端不读了，但【没断连】→ deepseek 把整段生成完、照计费；
+  而我们的 mid-stream abort 补丁（pi-agent-core/dist/agent.js:170,338）把 aborted 的 usage 记成 0（EMPTY_USAGE）
+  → provider 真实计费了、pi 记 0 → 这笔钱看不见。**打断本身是正常的（设计），漏的是「通知云端停」**。
+**修复**: ①建流后注册 signal abort 监听 → `openaiStream.controller.abort()`（立刻断连）；
+  ②循环顶 `if(signal.aborted){controller.abort();break;}`（break 触发异步迭代器 return() → 取消流 → 断连）。
+  所有实例（主/hc/sc/sl）+ 压缩都走这条 streamSimple → openai-completions，一处修全覆盖（用户说的「记忆也是」）。
+**原则**: 任何「中途放弃一个流式请求」的地方，都要确认【上游连接真的被取消】，不能只停本地消费。
+  否则服务器继续算、继续计费，而本地把它当 0 —— 钱烧了还看不见。
+**持久化**: 此改在 node_modules（npm 重装会丢）→ 存为 `dist-overrides/openai-completions.js`，
+  install.sh 版本校验（pin 0.79.1）后整文件 cp 回。改了行为就重新存 golden。

@@ -1,0 +1,59 @@
+# technology.server — 云端/本地服务
+
+agent 使用的后端基础设施。phone app 调用这些服务获取能力。
+
+## browser-service（浏览器服务）
+
+用 playleft（自写零依赖 CDP 客户端）控制 headless Chrome，为 agent 提供动态网页访问能力。
+
+### 架构
+
+```
+phone app (Safari 等)
+  → HTTP POST http://localhost:9222
+    → browser-service.cjs
+      → playleft.cjs (WebSocket CDP)
+        → Chrome headless
+          → 网页
+```
+
+### 启动
+
+```bash
+# 本地（默认，用系统 Chrome）
+CHROMIUM_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" node browser-service.cjs
+
+# 云服务器
+CHROMIUM_PATH=/usr/bin/chromium-browser BROWSER_PORT=9222 node browser-service.cjs
+```
+
+### 切换本地/云端
+
+pi-coding-master 通过环境变量 `PI_BROWSER` 切换：
+- 不设 = 默认 `http://localhost:9222`（本地）
+- `PI_BROWSER=http://your-server:9222`（云端）
+
+### API
+
+POST JSON，所有操作通过 `action` 字段区分：
+
+| action | 参数 | 说明 |
+|--------|------|------|
+| open | url | 打开网页（执行 JS，等待加载） |
+| text | limit? | 读取页面全部文字 |
+| links | limit? | 列出链接 |
+| search | query | 在页面内搜索文字 |
+| click | selector | 点击元素 |
+| type | selector, text | 输入文字 |
+| scroll | direction?, amount? | 滚动 |
+| back | | 后退 |
+| url | | 当前 URL |
+| cookie_import | cookies[] | 导入 cookies |
+| cookie_export | | 导出 cookies |
+| close | | 关闭页面 |
+
+### 文件
+
+- `playleft.cjs` — 零依赖 CDP 客户端（~200行），直接用 Node 原生 WebSocket 控制 Chrome
+- `browser-service.cjs` — HTTP API 包装，cookie 持久化
+- `data/cookies/` — 自动生成，per-session cookie 存储

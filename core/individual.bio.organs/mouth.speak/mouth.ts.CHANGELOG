@@ -1,0 +1,15 @@
+[2026-06-15 21:14:13] created
+[2026-06-15 21:21:06] edited (auto-logged, no messageDescription)
+[2026-06-15 21:21:53] edited (auto-logged, no messageDescription)
+[2026-06-15 22:03:36] edited (auto-logged, no messageDescription)
+[2026-06-15 22:03:44] edited (auto-logged, no messageDescription)
+[2026-06-15 22:32:57] edited (auto-logged, no messageDescription)
+[2026-06-15 22:33:06] edited (auto-logged, no messageDescription)
+[2026-06-15 22:33:14] edited (auto-logged, no messageDescription)
+[2026-06-15 22:33:38] edited (auto-logged, no messageDescription)
+[2026-06-15 22:36:39] edited (auto-logged, no messageDescription)
+[2026-06-16 03:58] 用户要求：工具名从 say 改为 mouth，label 从 Say 改为 Mouth
+[2026-06-16 04:05] 修复截断：去除 .slice(0,80)，mouth 显示完整文本不再被砍
+[2026-06-16 03:58:32] edited (auto-logged, no messageDescription)
+[2026-06-16 04:05:20] edited (auto-logged, no messageDescription)
+[2026-06-16 04:06:14] edited (auto-logged, no messageDescription)

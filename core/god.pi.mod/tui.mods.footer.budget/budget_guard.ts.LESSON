@@ -1,0 +1,12 @@
+# budget-guard.ts — LESSONS
+
+## 2026-06-15 余额提示别垫在记忆快照前面（cache 杀手）
+**症状**: deepseek cache 命中率长期很低，单日 ~2.94 亿 token cache-miss，几百块烧在 miss 上。
+**根因**: trip() 用 `deliverAs:"steer"` 把含【会变的余额数字】的 budget-trip 消息插进消息流；
+  而 poll「启动即查」会在 session 开局就触发 → 这条 65 字小消息垫在了 ~90 万 token 的
+  memory-snapshot【前面】。KV cache 只认前缀：前缀前 65 字一变，后面 90 万 token 全部 miss。
+  余额一直低 + 反复重启 → 每次重启全量 miss ≈ 2.7 亿，几乎正好就是观测到的 miss 总量。
+**修复**: budget-trip 改 `deliverAs:"nextTurn"`（垫到尾部）；即时可见性由 before_agent_start 的
+  setWorkingMessage 负责。快照重新成为稳定的第 1 条消息。
+**原则**: 任何【含会变内容】的注入消息（余额/时间/计数/状态）一律垫到 tail，绝不能排在大块稳定内容前面。
+  顺序铁律见 [[memory.ts.LESSONS]]。

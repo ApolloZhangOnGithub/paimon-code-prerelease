@@ -1,0 +1,10 @@
+[2026-06-15] created, by Claude Code
+- 新增 device「Terminal」能力：模型可调的【工具】terminal（不是 slash 命令——训练是模型发起的，得它自己开）。
+  actions: run / peek / list / close。
+- run：tmux new-session 起一个 dev-<name> 会话跑命令 = 真 TTY → tqdm/进度条/\r 刷新/训练日志【正常渲染】，
+  用户 attach 就能看实况（run() 做不到，它吞 \r）。命令结束后 exec bash -i 让画面留住，随时回看。
+- peek：capture-pane 抓当前画面 → 模型自己也能看进度、向用户汇报。list/close：管理 dev-* 会话。
+- 为什么 tmux 不用 Terminal.app(osascript)：用户常远程，Mac GUI 窗口远程看不到；tmux 可 SSH/网页终端 attach，
+  且和 hc/sc/sl 一路。dev- 前缀与那些子系统区分。
+- 在 techs/phone/index.ts 的 session_start 里 registerTerminal(pi) 接入。
+- ⚠️ 部署：techs/phone 是 DEV 源，需 cp/install 同步到 live ~/.pi/agent/extensions/device/ 再重启才生效。

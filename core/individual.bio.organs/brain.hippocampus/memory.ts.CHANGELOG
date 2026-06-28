@@ -1,0 +1,66 @@
+[2026-06-15] 记忆系统大修（崩溃 + 缓存 + 静默失败），by Claude Code
+
+背景：实例反复崩 "400 max context 1048565, requested 1.15M"；状态栏显示 38% 却实际 113%；
+单日 49M tokens、16M 未命中（缓存被毁）；sleep 几天没真正运行。逐项修：
+
+1. estimateTokens：chars/4 → CJK-aware（CJK ×1.8 + 其余 /4）。
+   根因：chars/4 对中文少算约 7 倍 → 真 1.15M 只估成 ~38% → 容量永不报警、保护永不触发。
+   实测那份 1.5MB context：旧估 384,809（≈状态栏 38%），新估 598K（接近真实）。
+
+2. 注入加硬预算：MEMORY_BUDGET = 窗口×0.35，cortex/work/context 按 token 尾部切（sliceToTokens）。
+   原 isOverHalf 保护用 chars/4 误判（1.8MB 估成 467K < 500K）→ 不触发 → 全量注入撑爆。
+   修后：compacted 对话(~382K)+记忆(≤350K)+overhead < 1.048M，不再爆，pi compaction 终于有效。
+
+3. cortexPath ReferenceError：before_agent_start 里 sediment 用了未定义的 cortexPath（一触发就崩）
+   → 改成 path.join(personDir, "cortex.md")。
+
+4. sleep import 路径修复：import("./sleep-session.js") → import("./sleep.js")（文件实为 sleep.ts）。
+   原路径一直 import 失败 → sleep 工具掉进 catch → 独立 sl- 实例从未启动 → work→cortex 巩固是死的。
+
+5. sleep 失败不再假装成功：catch 原来返回 "😴 已进入睡眠(inline mode)" 笑脸 → 改成 ❌ 显眼报错 +
+   isError:true，且不再把 dnaState 置 sleep（没真睡着就别装睡）。这是"坏了为啥不报错"的直接元凶之一。
+
+6. 【缓存大修】注入架构改为「快照一次 + 增量后 append」：
+   - session_start：buildSnapshot() 注入稳定前缀【一次】（memory-snapshot 消息）。
+   - before_agent_start：删除所有 systemPrompt 注入，不再 return systemPrompt（前缀逐轮稳定 → 命中）。
+     work_memory 增量、容量提醒、到期提醒一律 sendMessage(deliverAs:nextTurn) 追加在末尾。
+     cortex 沉降 / events 修剪只写文件。
+   根因：旧逻辑每轮把增长的 context+notes 重灌进 systemPrompt（缓存前缀）→ 每轮全废 → 49M/天。
+   代价：会话中途后台整理的新 cortex 要下个会话才进快照（可接受）。
+   message_end 不回存 messageType 以 "memory-" 开头的注入消息（防反馈环）。
+
+未做（待定/属功能而非 bug）：work/cortex 分成 module workmem/cortexmem/deepcortexmem；
+sleep.ts 深睡接进 sleep.night duty；运行期自检/痛觉(health check)。
+
+⚠️ 改动要重启 pi 实例才生效（运行中的进程加载的是旧代码）。pi compaction 已是 enabled:false（保留）。
+
+[2026-06-15 续] 容量警告语义修正（"91% 危急" vs footer "42%" 的矛盾）
+- 病：警告用「原始文件总量」(context+work+cortex) 报 "记忆危急 X%、会崩"，但注入早已封顶 35% → 根本不会崩；
+  和 footer 的「实际注入 %」对不上，吓人又误导。
+- 修：警告改成说真话——同时点明 rawPct(文件占窗口%) 与 injCap(注入封顶%)，措辞从"危急/会崩"改成
+  "文件大了、超出封顶的旧记忆被截断、该 sleep 整理"。不再和 footer 打架。两个数测的本就是不同东西。
+
+[2026-06-15 续2] 撤掉所有切片，回到「整份注入」（守铁律 + 消除 91/42 矛盾）
+- 用户指令"不能 slice"。删掉 MEMORY_BUDGET、sliceToTokens、buildSnapshot 里的全部切片
+  → context + work_memory + cortex【整份】注入，不切。
+- 上一条"封顶35%不会崩"的容量警告随之作废：整份注入【会撑爆】，警告改回"危急、再涨会崩、立刻 sleep"。
+- 副作用(好的)：footer 的实际注入% 现在 ≈ 记忆文件% —— 之前"91% vs 42%"的矛盾正是切片造成的，已消除。
+- 代价(用户接受)：文件大于窗口会崩；防崩靠 sleep/nap 勤快压小（let the model decide），不靠机械切。
+- 缓存修复(快照一次 + 增量 append) 与 余额硬闸 均保留不变。
+
+[2026-06-15 续3] 加「超窗口兜底」破死锁（修"模型停下来/不working"）
+- 现象：context.md 涨到 ~1M token；纯"整份注入不切"→ 每轮撑爆窗口 → 模型停（且 hc 小号死了、没人把 context 压进 work）。
+  本质是纯 no-slice 在 context>窗口时的【死锁】：要它 sleep 缩小，但它撑爆跑不起来、就睡不了。
+- 修：buildSnapshot 默认仍整份注入（守"不切"）；cortex+work 永远全量；【仅当】整份会超过窗口 70% 时，
+  才把 context 切到「尾部刚好放得下」——保命优先（永不停止的生命，崩死比丢最旧 context 更糟），块标题 ⚠️ 提示去 sleep。
+- 容量警告同步：高占用 = "最旧 context 被兜底丢弃、该 sleep 把它编码走"（不再说"会崩"）。
+- 用户授权"赶紧修 bug，不管是什么"。这是对"绝对不切"的最小让步：平时绝不切，只在"切最旧 or 崩死"之间选活着。
+
+[2026-06-15 续4] 加「代码强制整理」（修"根本没有强制 sleep，只发消息靠模型自觉"）
+- 病：FORCE 线原来只 sendMessage "立刻 sleep"，全靠模型自觉去睡 → 它不睡 → 涨到 1M。
+  memory.dna.md 写的"85%→几乎强制 sleep"从来【没被写成代码】，只是条强烈措辞的消息。这才是 context 失控的根。
+- 修：FORCE 线代码直接调 forceArchiveOldestContext()——把最旧 ~30% context 整段搬进 deep_cortex（可回捞）、
+  从 context 删掉，【不等模型】。非有损（原文搬走，不是总结）、不写 work_memory（不碰海马体地界）、
+  只主进程做（getSessionRole()==="main"，防多实例抢写）。
+- 这才是真正的"代码强制"。配合 70% 注入兜底 = 双保险：归档让磁盘文件不失控，兜底让注入永不超窗口。
+[2026-06-19] memory 增量段改用包裹格式：---[hippocampus-work]--- / ---[context-delta]---，不再用旧 [] 格式

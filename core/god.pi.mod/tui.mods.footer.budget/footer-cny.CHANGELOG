@@ -1,0 +1,39 @@
+[2026-06-15] footer 货币符号 $ → ¥（by Claude Code）
+
+改了什么：pi 状态栏的费用从 `$3.057` 改成 `¥3.057`。
+为什么：deepseek 的单价（models.json: input 1.74 / output 3.48 / cacheRead 0.145）和余额接口
+        （/user/balance 返回 currency=CNY）全是人民币；pi 的 footer 却把符号写死成 `$`，误导成美元。
+
+改在哪（⚠️ 在 node_modules 里，升级 pi 会被覆盖，需重打）：
+  /opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/components/footer.js
+  约第 128 行：
+    旧: const costStr = `$${totalCost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`;
+    新: const costStr = `¥${totalCost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`;
+
+重要注意：这个 ¥ 值仍然【偏低】——我们的 mid-stream abort 补丁（agent.js:170）会让被 abort 的流
+        记成 usage=EMPTY（agent.js:338），provider 实际计费了但 pi 记 0。所以状态栏的 ¥ 只是参考，
+        【真实花费/余额以 deepseek /user/balance 接口为准】（见即将做的余额硬闸）。
+
+[2026-06-15 续] footer 加「真实余额」同显（已做）
+  - 顶部加 import { readFileSync } from "node:fs" + { homedir } from "node:os"。
+  - costStr 推入后，读 ~/.pi/agent/.pi-coding-master-balance.json（余额硬闸 budget-guard 轮询写入），
+    statsParts.push(`余额¥X`)（触发停机时带 🛑）。
+  - 效果：状态栏「花费¥(pi算的,偏低) + 余额¥(deepseek真账,地面真值)」同时显示。
+  - ⚠️ 同样在 node_modules 里，升级 pi 要重打。footer.js 约 1-3 行 + costStr 块后。
+
+[2026-06-15 续] 余额旁加「真实烧钱速率 ↓¥/min」
+  - 读余额文件里的 ratePerMin，显示成 `余额¥X ↓¥Y/min`（来自 deepseek 真账，账户全实例）。
+  - 为啥重要：footer 那个 `¥`(pi 自己算的) 因 abort 不计而严重偏低（出现过"总额 ¥1.3 但实际 ¥14/min"
+    的矛盾）——所以真相看「余额 + ↓¥/min」，那个 pi 的 ¥ 只能参考、别信。
+
+[2026-06-15 续] 花费显示「三个 session 分别 + 总和」
+  - 原来只显示主进程自己的 ¥，看不到 hc/sc/sl。改成：主进程用 pi 原生(实时)，hc/sc/sl 读各自
+    ~/.pi/memory/<id>/.data/cost-<role>.json（budget-guard 每 turn_end 写）。显示 `主¥X hc¥Y sc¥Z [sl¥W] 计¥T`。
+  - 拿真实数据验证：主¥1.60 hc¥0.31 sc¥0.11 计¥2.02。
+  - ⚠️ 仍是 pi 自己算的(因 abort 偏低)，只看「相对哪个实例花得多」；账户真实总额仍以「余额 ↓¥/min」为准。
+  - footer.js 在 node_modules，升级 pi 要重打；改动需重启 pi 才加载。
+
+[2026-06-15 续] 余额置顶 + 持久化（不用再手动重打了）
+  - statsParts.push(余额)→ unshift：太宽时 truncateToWidth 砍尾部会把余额切掉，置顶则永不被截。
+  - 持久化：整个改好的 footer.js 存成 dist-overrides/footer.js（golden），install.sh 版本校验后 cp 回。
+    以后 npm 重装不再丢，也不用手动重打。改了行为就重新存 golden（见 dist-overrides/README.md）。

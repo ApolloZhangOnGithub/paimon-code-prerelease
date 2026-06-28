@@ -1,0 +1,13 @@
+# bioclock.ts — LESSONS
+
+## 2026-06-15 双时间戳 = standalone 旧重复体被 install.sh 部署回来
+**症状**: 每条消息出现两遍时间戳 / 两条 "Current date"。
+**根因**: bioclock（bios，由 kernel 装配）已负责时间戳；但 install.sh 还 `cp` 了独立的
+  `extensions.DEV/timestamps.ts` 到 `~/.pi/agent/extensions/`，pi 按目录扫描把它当独立扩展【二次加载】
+  → 两个都注入。`wise_file` vs bios `fileactions` 同理。
+**修复**: ①注释掉 install.sh 里 `cp timestamps.ts*` / `cp -r wise_file` 两行；
+  ②live 端把 `timestamps.ts` 改名 `*.DISABLED-dup-of-bioclock`（非删除、可逆，pi 不再加载）。
+**原则**: 一个机能合进 bios（kernel 装配）后，必须把旧的 standalone 版从部署里去掉。
+  bios 版与 standalone 版是同一机能的两份实现 → 二选一，绝不共存，否则 pi 目录扫描双加载。
+**附**: bioclock 给消息打时间戳是在 message_end / tool_result 时【一次性】打到那条消息上（基于消息自己固定的
+  timestamp），历史消息不会被重新打时间 → 不破坏 KV cache。这点是对的，别改成每轮重算。

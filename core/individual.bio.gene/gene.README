@@ -1,0 +1,19 @@
+//rules.dna
+//future 未来实现，不创建
+//vir 最前面带有.不用创建的层级地址，去掉.是一些func的前缀，func除了最后一个外，前面的每一层必须用vir声明以解释
+//func 创建的实际创建的文件夹名，下面
+//module func下的功能组，是[func name]/module/[module name]的文件夹
+//mode func的具体模式，类似于配置
+//alis 别名，不是文件夹名，alias也不能重复，但可以用来被当作实名使用，会被正确系系
+//belong 标注vir或func属于的tag（vir在名字里，因此不需要标注belong [vir]），tag也可以belong所属的vir或func
+//contain 标注含有的类，vir可以contain tag，func不可以contain，tag下contain的tag需要用tag.命名，但可以用alias
+//mode 用于声明状态
+//mode:abled/diabled 用来描述mode下开启的func，any是保留词，意味着任何mode都启用，none则是任何都不启动，表示禁用之类
+    //后续也可以开发更复杂的if规则之类。没有able的mode默认disabled，但是在编译时会报warning
+//session 声明窗口，session的名字可以和func的重复，mode的也是，因为类型不同
+    //func下用session用于声明是否func运行在一个独立窗口。有all和none为保留词，表明运行在所有还是用独立的session或者几个
+    //没有生命的默认是all，但编译时回warning
+//in 用来描述func在不同状态mode下的行为
+//duty 表示职责。默认是func local命名变量，只对当前func有用
+//abled/disabled 用来描述该mod下启动的func的模块，module是[func_name]:[module_name]来引用
+//对于contain和belong，编译后变成RNA，就会把单向自动变成双向。有矛盾会检测和报错。

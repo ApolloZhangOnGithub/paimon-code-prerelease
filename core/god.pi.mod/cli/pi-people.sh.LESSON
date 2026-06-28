@@ -1,0 +1,10 @@
+# pi-people.sh — LESSONS
+
+## 2026-06-16 改了 deepseek key 却一直 402——环境变量优先于 models.json
+**症状**：把 ~/.pi/agent/models.json 的 deepseek apiKey 换成新 key，余额闸还显示新 key 的 ¥49.99，但模型调用一直 402 "Insufficient Balance"。改 models.json、改 settings、重启、杀干净老进程，全没用。查了好几个小时、烧了好几次。
+
+**根因**：pi 解析 key 的顺序是 `authStorage.getApiKey(provider) ?? models.json.apiKey`，而 authStorage 会先读环境变量 `DEEPSEEK_API_KEY`（auth-storage.js:427-429，env key 在 includeFallback 判断之前就 return 了）。也就是说——**环境变量里的 key 永远盖过 models.json 里配的 key。** shell(~/.zshrc)里残留的旧 key（那个负余额账号）就这么一直被用 → 402。改 models.json 是白改；连"余额闸显示新 key 余额、模型调用却 402"这种矛盾，都是因为余额闸读 models.json、模型调用走 env。
+
+**修复**：launcher(pi-people.sh)在启动 pi 前，从 models.json 读出 deepseek 的字面量 key，强制 `export DEEPSEEK_API_KEY=<它>`。这样 pi 进程（及它 spawn 的 hc/sc/sl 小号）永远用 models.json 的 key，不依赖飘忽的 shell 环境。单一真相源 = models.json。
+
+**教训 / 下次怎么避免**：排查"配置改了不生效"时，**先问"这个值实际从哪取、谁的优先级最高"——环境变量、凭证库(authStorage/keychain)通常优先于 config 文件里的 apiKey。** 别一头扎进 config 文件反复改、反复重启。先用一条命令把"实际用的是哪个值"打出来（如分别测两个 key），矛盾立刻现形。这次就是只盯 models.json、忘了 env 优先，白烧好几小时。

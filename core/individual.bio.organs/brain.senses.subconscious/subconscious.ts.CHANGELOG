@@ -1,0 +1,7 @@
+[2026-06-15] by Claude Code
+- prompt 内联：createSubconscious 里 SUBCONSCIOUS_PROMPT 改成 getPrompt("subconscious.observe")，
+  删掉中间层 prompt.ts。
+- 加级联看门狗：sc 启动脚本加 MAIN_PID=主意识 pid + 后台子进程轮询 kill -0；主意识进程一退出 →
+  自动 tmux kill-session 把本 sc 实例连 tmux 一起关掉（循环顶也查一次）。
+  解决"主程序死了 sc 还自启自跑、孤儿常驻烧钱"。
+- ⚠️ 当前正在跑的旧孤儿用的是没看门狗的旧脚本，需手动 tmux kill-session 清掉；之后新 main spawn 的才带看门狗。

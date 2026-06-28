@@ -1,0 +1,6 @@
+[2026-06-12 16:13:45] edited (auto-logged, no messageDescription)
+[2026-06-12 16:13:45] added hebbian.ts, people.ts, logistics.ts, graph-viewer.mjs to install copies
+[2026-06-12 16:15] added touchfish.ts to install copies
+[2026-06-12 16:15:07] edited (auto-logged, no messageDescription)
+[2026-06-12 16:27:18] edited (auto-logged, no messageDescription)
+[2026-06-12 16:27:20] fix: fallback to extensions-disabled/ for notification, message dirs

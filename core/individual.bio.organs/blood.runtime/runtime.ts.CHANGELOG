@@ -1,0 +1,5 @@
+[2026-06-15] created, by Claude Code
+- 核糖体侧：读 bios/dnas/rna.json，向各 func 提供 getPrompt / getDuty / getDutyPrompt / getFuncPrompts /
+  isAbled / getMode·setMode / SessionRole 等。
+- RNA 含错误时拒绝运行（fail loud）；支持 mode 别名(wake→DWN, sleep→sleep.night) 与 func 别名解析。
+- 路径默认相对本文件 ../bios/dnas/rna.json，可用 env PI_ALIVE_RNA 覆盖（部署用）。

@@ -1,0 +1,10 @@
+[2026-06-15] created, by Claude Code
+- 新增余额硬闸（代码强制）：盯 deepseek 真实余额（地面真值，免疫 mid-stream abort 导致的 pi 内部少算）；
+  余额 ≤ FLOOR 或 烧钱速率 > RATE → 连小号(按 title pkill)一起停 + 显眼告警 + turn 前拦截；/budget 查看、resume 解除。
+- 轮询写 ~/.pi/agent/.pi-coding-master-balance.json 供 footer 显示真实余额。详见 budget-guard.ts.SPEC。
+
+[2026-06-15 续] 改成"只防烧穿"+ 各实例写花费
+- 撤掉速率线 trip：用户明确"不能限制他们认真干活"。现在【只在余额 ≤ FLOOR 时硬停】（防烧穿）；
+  速率(ratePerMin)只测量+写文件+/budget 显示，【不再拦】。
+- turn_end 各实例把自己 session 的累计花费写本人 .data/cost-<role>.json（main/hc/sc 分别）。
+  ⚠️ 这是 pi 自己算的，因 abort 流不计而偏低，只作相对参考；账户真实总额/速率看余额接口。

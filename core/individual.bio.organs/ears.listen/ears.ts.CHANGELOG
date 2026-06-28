@@ -1,0 +1,48 @@
+## 2026-06-15 19:10 CST — 重写：去掉 Local_24h_Note 依赖
+
+- 删除 SERVER_CMD（旧：硬编码指向 Local_24h_Note 的服务启动命令）
+- BRIDGE_SCRIPT → RECORDER_SCRIPT，指向新的 ear_recorder.py
+- 移除所有 Local_24h_Note 引用（ear_bridge.py 不再使用）
+- 状态栏从"转录服务器"改为"录音器"
+- 消息注入去掉 app 标记（[🎤] 不再带 app 名）
+[2026-06-15 19:35:43] edited (auto-logged, no messageDescription)
+19:35 - 修复命令解析优先级bug: (args?._?.[0] || args?.on ? ...) 三元嵌套问题
+[2026-06-15 19:40:41] edited (auto-logged, no messageDescription)
+19:40 - FIXED: pi passes args as string, not object with _. Changed command parsing to treat args directly as 'on'/'off' string
+[2026-06-15 19:41:06] edited (auto-logged, no messageDescription)
+[2026-06-15 19:42:03] edited (auto-logged, no messageDescription)
+[2026-06-15 19:42:26] edited (auto-logged, no messageDescription)
+[2026-06-15 19:43:59] edited (auto-logged, no messageDescription)
+[2026-06-15 19:44:08] edited (auto-logged, no messageDescription)
+[2026-06-15 19:44:20] edited (auto-logged, no messageDescription)
+[2026-06-15 19:46:32] edited (auto-logged, no messageDescription)
+[2026-06-15 19:49:54] edited (auto-logged, no messageDescription)
+[2026-06-15 19:51:24] edited (auto-logged, no messageDescription)
+[2026-06-15 20:04:15] edited (auto-logged, no messageDescription)
+[2026-06-15 20:06:58] edited (auto-logged, no messageDescription)
+[2026-06-15 20:18:46] edited (auto-logged, no messageDescription)
+[2026-06-15 20:19:17] edited (auto-logged, no messageDescription)
+[2026-06-15 20:20:28] edited (auto-logged, no messageDescription)
+19:34 — display: true → false，防止转录文字出现在输入框
+[2026-06-15 20:22:32] edited (auto-logged, no messageDescription)
+[2026-06-15 20:25:33] edited (auto-logged, no messageDescription)
+[2026-06-15 20:34:07] edited (auto-logged, no messageDescription)
+[2026-06-15 20:38:33] edited (auto-logged, no messageDescription)
+[2026-06-15 20:40:11] edited (auto-logged, no messageDescription)
+[2026-06-15 20:41:27] edited (auto-logged, no messageDescription)
+[2026-06-15 20:43:34] edited (auto-logged, no messageDescription)
+[2026-06-15 20:44:31] edited (auto-logged, no messageDescription)
+[2026-06-15 20:45:51] edited (auto-logged, no messageDescription)
+[2026-06-15 20:46:20] edited (auto-logged, no messageDescription)
+[2026-06-15 20:46:56] edited (auto-logged, no messageDescription)
+[2026-06-15 20:49:15] edited (auto-logged, no messageDescription)
+[2026-06-15 20:49:23] edited (auto-logged, no messageDescription)
+[2026-06-15 21:00:56] edited (auto-logged, no messageDescription)
+[2026-06-15 21:01:36] edited (auto-logged, no messageDescription)
+[2026-06-15 21:01:57] edited (auto-logged, no messageDescription)
+[2026-06-15 21:06:37] edited (auto-logged, no messageDescription)
+[2026-06-15 21:06:56] edited (auto-logged, no messageDescription)
+[2026-06-15 21:15:15] edited (auto-logged, no messageDescription)
+[2026-06-15 21:16:11] edited (auto-logged, no messageDescription)
+[2026-06-15 21:29:08] edited (auto-logged, no messageDescription)
+[2026-06-16] 命令真正改名 /ear → /ears：registerCommand、messageDescription、状态栏 🎤 ears、顶部注释、ear.ts.SPEC 全部对齐。此前别处 changelog 声称已改名但代码仍是 /ear（只动了文档没动代码），本次把代码改齐，编译通过。

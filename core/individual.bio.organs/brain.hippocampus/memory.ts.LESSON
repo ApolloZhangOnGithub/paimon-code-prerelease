@@ -1,0 +1,25 @@
+# memory.ts — LESSONS
+
+## 2026-06-15 KV cache 靠「顺序」，不是靠「少注入」
+**背景**: 铁律是【整份注入、禁止 slice】，所以快照大（~90 万 token）是接受的；省钱靠 cache 命中，不靠切。
+**命中的前提（顺序，缺一不可）**:
+  1. systemPrompt 必须日内稳定 —— pi 自带的只塞 `Current date:`（每天变一次）+ cwd，OK；
+     我们 6 个 func 的 append 是常量、注册顺序固定，OK。**别往 systemPrompt 塞每轮变的东西**。
+  2. 记忆快照只在 session_start 注入【一次】，本会话绝不重发（before_agent_start 不 return systemPrompt）。
+  3. 快照内部顺序 = 稳定→易变：DNA → cortex → work_memory → context。前缀（DNA+cortex）跨会话能命中。
+  4. 一切新内容（work_mem 增量 / 容量提醒 / 到期 / date / 余额）一律 append 到 tail（deliverAs nextTurn）。
+**坑**: 任何排在快照【前面】且会变的消息，会让整份 90 万 token 快照 miss。已踩过的：budget-trip（见
+  [[budget-guard.ts.LESSONS]]）、双 unstop-date（见 [[bioclock.ts.LESSONS]]）。
+**还没解决（诚实）**: 当前 live 的 context 已涨到 65 万~86 万 token，整份注入下逼近 1M 窗口。
+  forceArchiveOldestContext 到 FORCE 线才搬最旧 30% 进 deep_cortex；长期要靠 sleep/nap 持续消化。
+  重启清掉臃肿 context 是最快的止血。capacity 监控用 CJK 估算（中文 ≈1.8 token/字，别用 chars/4，会少算 7 倍）。
+  （注：2026-06-16 已把 pi 自带的 `Current date:` 注入也从 system-prompt.js 去掉了——少一个每天变的东西，缓存更稳。见 [[../../../deploy.ALL/dist-overrides/system-prompt.js.LESSONS]]）
+
+## 2026-06-16 sleep 睡完根本没叫醒主意识——工具文案撒谎，onComplete 是个死回路
+**症状**: 问"睡好了会提醒模型吗"。查代码：sleep 工具返回文案写着"完成后会自动注入 wake feel"，但 launchSleepSession 的 onComplete 回调里**只有** `dnaState="wake"; sleepHandle=null`——只翻了个内部变量，从没调 sendMessage、没唤醒、没通知任何人。主意识 sleep 前若 hibernate 了(enabled=false)，就一直睡到用户来才醒。**文案承诺的功能，代码里根本不存在。**
+**根因**: `dnaState` 只在【下次】session_start 被读去选 wake.dlc/sleep.dlc，对正在跑/已 hibernate 的主意识毫无作用。唤醒要走 `pi.sendMessage({...},{isTriggerNewTurn:true})`（心脏 process.ts/stop.ts 唤醒就是这么干的），onComplete 一个都没用上。
+**修复（设计忠实，器官只走 pi）**:
+  - 海马体 onComplete：注入 `messageType:"sleep-done"` 的 wake feel + isTriggerNewTurn → 主意识被叫醒。
+  - 心脏 stop.ts：`pi.on("message_start")` 听到 sleep-done 就 `state.enabled=true` 重新点亮 continuous → 主意识真正活过来续命，而不是醒一个 turn 又僵住（hibernate 后 enabled=false，光 isTriggerNewTurn 一个 turn 完 agent_end 又停）。
+  - 跨器官不 import：海马体碰不到心脏的 state，心脏也不认识睡眠实例——只通过 pi 的 sleep-done 消息握手。这是这套架构里器官通信的唯一合法通道（grep 验证过：器官之间零互相 import）。
+**教训**: **工具返回文案写"完成后会自动 X"，必须去代码里确认真有 X。** 文案是给模型看的承诺，承诺和实现脱节 = 模型以为有这功能、其实是死的，比没写还坑（这张"自动注入 wake feel"的空头支票挂了不知多久）。查"完成后会怎样"，要一路追到真正 sendMessage/改状态那行，别看到个 `dnaState="wake"` 就以为闭环。

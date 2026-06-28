@@ -1,0 +1,11 @@
+[2026-06-15] created（追踪本次重构），by Claude Code
+- 从 brain.hippocampus/hippocampus.sleep/sleep.ts 移到 brain.hippocampus/sleep.ts（扁平化，去掉嵌套子目录）。
+- import 深度随之 4 层→3 层：getPrompt 从 "../../../../engine/runtime.js" → "../../../engine/runtime.js"。
+- prompt 改走 coded.dna：const SLEEP_PROMPT = getPrompt("hippocampus.sleep")，不再硬编码。
+- 配套修复（在 memory.ts）：sleep 工具的 import 从 "./sleep-session.js" 改成 "./sleep.js"——
+  原路径一直 import 失败 → sleep 从未真正启动。详见 memory.ts.CHANGELOG。
+
+[2026-06-15 续] 加级联退出（by Claude Code）
+- sleep 启动脚本加 MAIN_PID + 循环顶 kill -0 检查：主意识没了就退出。
+- 不用常驻看门狗（睡眠是短任务：编码完 CODE 0 就 break 退出，常驻看门狗会卡住 tmux、让 onComplete 永不触发）。
+- 注意：主意识 hibernate ≠ 进程死。hibernate 时进程还在，kill -0 仍为真，sleep 照常完成。

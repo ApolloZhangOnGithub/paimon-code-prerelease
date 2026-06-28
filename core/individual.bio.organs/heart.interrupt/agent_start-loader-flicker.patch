@@ -1,0 +1,13 @@
+--- a/modes/interactive/interactive-mode.js
++++ b/modes/interactive/interactive-mode.js
+@@ -2197,8 +2197,8 @@
+                 if (this.retryLoader) {
+                     this.retryLoader.stop();
+                     this.retryLoader = undefined;
+                 }
+-                this.stopWorkingLoader();
+-                if (this.workingVisible) {
++                if (!this.loadingAnimation && this.workingVisible) {
+                     this.loadingAnimation = this.createWorkingLoader();
+                     this.statusContainer.addChild(this.loadingAnimation);
+                 }

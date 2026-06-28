@@ -1,0 +1,3 @@
+[2026-06-15] by Claude Code
+- PROMPT([CONTINUOUS AGENT]/wait·hibernate 说明) 改为 getPrompt("heart.continuous")，从 coded.dna 取，不再硬编码。
+[2026-06-15 22:45:52] edited (auto-logged, no messageDescription)

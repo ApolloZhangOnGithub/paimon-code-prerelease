@@ -1,0 +1,82 @@
+# pi-alive v0.2.7-stable
+
+Released: 2026-06-29
+Stats: 303 files, 31.3k LOC, 2.4MB
+Platform: macOS + Linux
+
+## vs v0.2.6-stable (2026-06-22)
+
+### npm 一键安装
+- 新增 package.json，支持 `npm i -g pi-alive` 一键安装/更新
+- postinstall 自动执行 deploy/install.sh
+- install.sh 重写：自动检测 DEV 模式 vs 发行包模式
+- Linux 路径兼容（/usr/local/lib、nvm/fnm）
+- bash 补全同时接入 .zshrc 和 .bashrc
+
+### 心脏 (heartbeat)
+- 状态机 agent_start 修复：resting 状态下有 turn 立刻 transition 到 alive（不再卡 resting）
+- agent_end aborted steer：resting 期间被 steer 也正确恢复 alive
+- hasUserMessage 在 agent_start 无条件清零（不再因 system message 误触）
+- error backoff 初始改为 20s（原 60s 太慢），上限 300s（原 60s 太低）
+
+### 记忆 (memory)
+- 去掉所有内容截断（tool=2000, think=500, text=10000 全部移除）
+- 统一时间戳为 ts_start + ts_end（不再只记 ts）
+- DNA+DLC 纳入容量计算
+- ctxBudget<=0 溢出修复
+- estimateTokens 替代 chars/4（CJK 1.8 token/字）
+- forceArchiveOldestContext 行切分修复
+- editcontext 用 estimateTokens 替代 chars/4
+- dnaState 在 sleep 失败时正确重置
+- nap 工具移出 PI_DEV 限制
+- UBI display:false + PI_DISABLE_UBI=1
+- 污染告警暂时禁用
+- 新增 /context 命令（视觉网格显示）
+
+### DNA 提示词
+- heart.continuous 完全重写：解释实际机制（terminate:true、followUp、agent_end），不再用比喻
+- heart.commands 新增 execute 只读说明、write/edit 区分规则
+- fileactions.rules 新增
+
+### Footer
+- 两行布局：第一行状态灯+记忆，第二行身份+模型
+- 中文标签（潜意识/海马体，不用 sc/hc）
+- 记忆占比右对齐
+- 钱包默认隐藏（PI_SHOW_WALLET=1 启用）
+- sc/hc 状态 2 秒缓存（不每帧 execSync）
+
+### TUI
+- tui.js 去掉 80 列宽度上限（自由宽度）
+- tui.js handleInput 去掉 try/catch（之前吞输入错误）
+- tui.js wrapCache 恢复引用比较（内容比较太慢）
+- tool-execution.js paddingX 改为 2
+- tool-execution.js replaceDot 同时匹配 ● 和 ○
+- assistant-message.js errorShown 重置 + content.thinking null guard
+
+### Bug 修复（42+ 个）
+- hippocampus.ts bash heredoc 提取到 template 文件
+- hippocampus-launcher.sh.template FAIL 计数器和 ERRLOG 移到 while 前
+- paths.ts 统一 personDir/personDataDir/personId
+- process.ts 去掉硬编码 personId
+- listen.ts pgrep 名称修复
+- speak.ts 竞态条件修复
+- sleep.ts 延迟 getPrompt 防 import 崩溃
+- spawner.ts backoff 参数修复
+- subconscious.ts aware watcher mutex
+- filewatch.ts watch import 修复
+- authorize.ts 路径穿越修复
+- prediction.ts regex SyntaxError 修复
+- imessage.ts trimmed 顺序修复
+- spy.ts 模板字面量引号修复
+- bilibili.ts duration NaN 修复
+- alipay.ts shell 注入修复
+- holiday-calendar.ts Memorial Day/lunar 修复
+- anthropic.js mapStopReason fallback
+- openai-completions.js msg.content?.some null guard
+- safari-app.ts recordHistory/CHROMIUM_PATH/URL check
+- amygdala.ts curly quotes 修复
+
+### 已知问题
+- resting/working UI 在某些时序下仍可能闪烁
+- footer 宽度在极窄终端下可能截断
+- 潜意识偶尔消失（tmux session 异常退出）

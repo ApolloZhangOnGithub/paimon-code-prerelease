@@ -1,0 +1,110 @@
+# func 设计规范
+
+`individual.bio.organs/` 下每个文件夹是一个 **func**（功能单元 / 生物学里的「蛋白质机器」）。
+本规范定义每个 func 必须长什么样，才能被 kernel 装配、被 DNA 管理、可运行。
+
+> 一句话：**func = 一个文件夹 + 一个 `index.ts` 入口 + 在 `promotor.dna` 里的一条声明 + 在 `coded.dna` 里的 prompt（如果它要 prompt）。**
+> prompt 文本只存在 `coded.dna` 一处；func 代码里**不许**再硬编码 prompt。
+
+---
+
+## 1. 文件夹 = func 名 = DNA 声明
+
+- 文件夹名就是 func 的**点分实名**，例：`brain.hippocampus`、`body.hands.fileactions`。
+- 这个名字必须和 `individual.bio.gene/dna.promotor/promotor.dna` 里的 `func <名字>` 完全一致。
+- 名字里除最后一段外，每一级前缀必须在 promotor.dna 里用 `vir .<前缀>` 声明过
+  （例：`body.hands.fileactions` 要求 `vir .body`、`vir .body.hands`）。transpiler 会校验，缺了直接报 error。
+- 扁平存放（不嵌套文件夹），层级体现在点分名里，靠排序 + 搜索找。
+
+## 2. 入口：func 里真正带 `default(pi)` 的那个文件
+
+```ts
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+export default function (pi: ExtensionAPI) {
+  // 在这里 registerTool / pi.on(...) / registerCommand ...
+}
+```
+
+- 入口 = 该 func 里**真正导出 `default(pi)` 的文件**，登记在 `engine/kernel.ts` 的 REGISTRY 里。
+- **不要空壳中间层**：不要为了"统一"建一个只 `export { default } from "./x.js"` 的 `index.ts`，也不要 `prompt.ts` 这种只包一层导出的文件。
+- `index.ts` 只在它**真的做组合**时才用（例：`body.heart/index.ts` 把 stop+process 装起来）。单文件 func 直接用 `<名字>.ts`：
+  `brain.hippocampus/hippocampus.ts`、`brain.senses.bioclock/bioclock.ts`、`body.hands.fileactions/fileactions.ts`。
+- import 用 `.js` 后缀（ESM/bun 约定），bun 会解析到对应 `.ts`。
+
+## 3. prompt：只在 `coded.dna`，运行期向 runtime 取
+
+func 代码里**禁止**写 `const PROMPT = "..."` 这种硬编码。所有 prompt 正文写在 `individual.bio.gene/dna.coded/coded.dna` 的 `coded <name> """ ... """` 块里，func 在运行期取：
+
+```ts
+import { getPrompt, getDuty, getDutyPrompt } from "../../../engine/runtime.js";
+
+const PROMPT = getPrompt("heart.continuous");                 // func 级 prompt
+const SLEEP  = getDutyPrompt("brain.hippocampus", "sleep.night"); // 某 mode 的职责 prompt
+```
+
+- `getPrompt(name)` —— 按 `coded:name` 取正文。取不到直接抛错（fail loud）。
+- `getDuty(func, mode)` / `getDutyPrompt(func, mode)` —— 取某 mode 下 `in/duty` 声明的 prompt。
+- **不要 `prompt.ts`**：在需要 prompt 的那个文件里直接 `getPrompt("...")`，别再单开一个文件包一层导出。
+- 占位符：prompt 正文里可用 `{NAME}`，由 func 自己 `.replace("{NAME}", 值)` 填（例：`drafting.think` 里的 `{MARKER}`）。
+- import 路径深度按 func 文件夹层数定：
+  `individual.bio.organs/<func>/x.ts` → 用 `#runtime` alias（package.json imports）；无需数相对层级。
+
+**两种 prompt 用法（都从 coded.dna 取，区别只是注入方式）：**
+- **A 注入宿主 agent**：`pi.on("before_agent_start", e => ({ systemPrompt: e.systemPrompt + "\n\n" + PROMPT }))`。
+  例：`body.heart`、`body.hands.fileactions`、`brain.predrafting`。
+- **B 喂给被 spawn 的子 pi**：把 prompt 写进子进程的 `conv.json` 的 system 角色。
+  例：`brain.hippocampus`、`brain.senses.subconscious`（spawn tmux 子 pi）。
+
+## 4. 在 `promotor.dna` 里声明（启动子 / 调控区）
+
+```
+func brain.hippocampus            // 文件夹名
+    session hippocampus           // 跑在哪个进程：main/subconscious/hippocampus，或 all/none
+    mode:abled any                // 哪些 mode 启用：any / none / <mode 列表>
+    alias memory.hippocampus      // 别名（可被当实名引用）
+    module workmem                // 子模块（[func]/module/[name]）
+    in DWN                        // 某 mode 下的行为
+        duty gen_work_mem
+            coded:hippocampus.gen_work_mem   // 这个 mode 用哪段 prompt
+    in sleep.night
+        duty deep_encode
+            coded:hippocampus.sleep
+    belong memory                 // 属于哪些 tag（双向，编译时自动补全 contain）
+    belong lobes.temporal,lobes.limbic
+```
+
+- `session` 缺省 = `all`（编译 warning）。`mode:abled` 缺省 = 全 disabled（编译 warning）。
+- `coded:<name>` 是**引用**，对应 `coded.dna` 里的 `coded <name>`。引用不到 = 编译 error。
+- `future func ...` = 规划中、**不建文件夹**、不被 kernel 加载（例：`brain.amygdala`）。
+
+## 5. 怎么被运行（kernel / runtime）
+
+1. 改了 `.dna` → 重新转录：`bun individual.bio.gene/dna.transpiler/transpiler.ts` → 生成 `individual.bio.gene/rna/rna.json`。
+2. `paths.ts`（#runtime alias）读 rna.json，提供 `getPrompt/getDuty/getMode/isAbled/...`。
+3. `individual.bio.organs/heart.main/kernel.ts`（pi 扩展入口）读 rna，把每个非 future func 的 default 装到同一个 pi 上。
+4. 部署：`ln -s Codebase/core ~/.pi/agent/extensions/pi-coding-master`（入口 `index.ts` 转发到 kernel）。
+- 命令：`/bios` 看状态（mode/角色/已加载 func），`/mode <m>` 切 mode。
+
+> 说明（诚实）：当前 kernel 在每个 pi 实例都加载**所有**非 future func，由 func 自己按 session 角色自门控
+> （潜意识/海马体自己检测身份），这与现行 live 行为一致。严格按 `session` 选择性加载是后续优化。
+
+## 6. 加一个新 func 的清单
+
+1. `individual.bio.organs/<新名字>/<名字>.ts`，导出 `default(pi)`（单文件直接用此名；要组合多文件才用 `index.ts`）。
+2. prompt 写进 `coded.dna`（`coded <name> """..."""`），func 里直接 `getPrompt("<name>")`（不开 prompt.ts）。
+3. `promotor.dna` 加 `func <新名字>`（session / mode:abled / coded: …），前缀 `vir` 要先声明。
+4. `individual.bio.organs/heart.main/kernel.ts` 的 `REGISTRY` 加一行 import，指向那个真正 default 的文件。
+5. `bun individual.bio.gene/dna.transpiler/transpiler.ts` 重新转录，确认无 error/warning。
+
+## 7. 现有 func 一览（符合本规范）
+
+| func | 入口文件 | session | mode | prompt(来自 coded.dna) |
+|---|---|---|---|---|
+| `body.heart` | index.ts | all | any | heart.continuous, heart.commands |
+| `body.hands.fileactions` | fileactions.ts | main | DWN | fileactions.wise |
+| `brain.predrafting` | index.ts | main | DWN | drafting.think |
+| `brain.senses.bioclock` | bioclock.ts | all | DWN | （无，纯时间戳）|
+| `brain.senses.subconscious` | index.ts | subconscious | DWN | subconscious.observe |
+| `brain.hippocampus` | hippocampus.ts | hippocampus | any | DWN→gen_work_mem / sleep.night→sleep / sleep.nap→gen_work_mem |
+| `brain.memory` | index.ts | main | any | （无 coded；注入 context/work/cortex 数据层）|
+| `brain.amygdala` | — | — | — | `future`，未实现 |

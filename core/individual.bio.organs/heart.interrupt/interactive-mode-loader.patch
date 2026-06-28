@@ -1,0 +1,11 @@
+--- a/modes/interactive/interactive-mode.js
++++ b/modes/interactive/interactive-mode.js
+@@ -1351,7 +1351,7 @@
+             this.ui.requestRender();
+             return;
+         }
+-        if (this.session.isStreaming && !this.loadingAnimation) {
++        if (!this.loadingAnimation) {
+             this.statusContainer.clear();
+             this.loadingAnimation = this.createWorkingLoader();
+             this.statusContainer.addChild(this.loadingAnimation);

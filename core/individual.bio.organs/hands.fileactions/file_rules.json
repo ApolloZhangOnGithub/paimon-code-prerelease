@@ -1,0 +1,23 @@
+{
+  "version": 6,
+  "rules": [
+    {"id":"spec-required","on":"write","block":"新建文件必须先写 .SPEC"},
+    {"id":"changelog-append","on":"edit","path":"*.CHANGELOG","block":"CHANGELOG 只追加不删不覆盖"},
+    {"id":"changelog-write-block","on":"write","path":"*.CHANGELOG","block":"CHANGELOG 不能直接 write，用 edit 追加"},
+    {"id":"dir-readme-ls","on":"ls","block":"目录有 dir.README 先读它"},
+    {"id":"dir-readme-read","on":"read","block":"目录有 dir.README 先读它"},
+    {"id":"dir-readme-write","on":"write","block":"目录有 dir.README 先读它"},
+    {"id":"dir-unseen-write","on":"write","block":"没 ls 过的目录不能直接写文件"},
+    {"id":"nametrace-rename","on":"bash","pattern":"mv\\s+\\S+\\s+\\S+","block":"改名写 .NAMETRACE，搬家写 .LOCATIONTRACE"},
+    {"id":"coded-needs-ref","on":"edit","path":"individual.bio.gene/dna.coded/coded.dna","block":"新增 coded 块必须在 promotor.dna 引用"},
+    {"id":"bios-new-dir","on":"write","path":"individual.bio.organs/*","block":"individual.bio.organs 下新建前读 promotor.dna/coded.dna/FUNC_SPEC.md"},
+    {"id":"github-block","on":"bash","pattern":"gh\\s+repo\\s+(create|delete)|git\\s+push.*--force","block":"GitHub 敏感操作拦截"},
+    {"id":"companion-auto","on":"write","block":"非伴随文件自动生成 .CHANGELOG"},
+    {"id":"companion-move","on":"bash","pattern":"mv\\s+\\S+\\s+\\S+","block":"mv 后自动迁移伴随文件"},
+    {"id":"no-secrets","on":"write","block":"禁止写入明文密码、token、密钥"},
+    {"id":"no-rm","on":"bash","pattern":"\\brm\\b","block":"禁止 rm！UNREGULATED 内除外。文件只能 mv 成 .REMOVED"},
+    {"id":"unregulated-quarantine","on":"bash","block":"bash 建文件无 .SPEC → 自动移入 UNREGULATED/"},
+    {"id":"unregulated-no-mv-out","on":"bash","pattern":"mv.*UNREGULATED","block":"UNREGULATED 文件不能 mv 出去"},
+    {"id":"workdir-only","on":"write","block":"只能在工作目录或信任目录内写文件"}
+  ]
+}

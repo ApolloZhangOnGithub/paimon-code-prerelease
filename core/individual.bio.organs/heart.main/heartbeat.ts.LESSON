@@ -1,0 +1,43 @@
+# heartbeat.ts 自唤醒 bug 复盘
+
+## 症状
+- `next({hibernate})` 后 ~30 秒自动醒来
+- 正常的 agent_end 后不自动续命
+
+## 根因
+
+### 1. 自唤醒
+`convertToLlm`（messages.js）处理 `case "custom"` 时：
+```js
+return { role: "user", content, timestamp };  // 丢了 messageType！
+```
+产出 `{role:"user", content:[...]}`，无 messageType，匹配 message_start 唤醒条件。
+
+### 2. 正常消息不续命
+hibernate 设了 `lastHibernateTs`。用户叫醒后 `message_start` 重新点亮 continuous，但没清零 `lastHibernateTs`。下一轮 agent_end 被 5 秒背压窗口 (`lastHibernateTs > 0 && < 5000ms`) 拦死。
+
+## 修复
+
+### stop.ts
+1. **message_start 唤醒时**：`lastHibernateTs = 0`（防背压误杀）
+2. **dlog 时间**：`toISOString()` → `toLocaleString("zh-CN", {timeZone:"Asia/Shanghai"})`
+3. **日志格式**：`String(msg.content)` → `JSON.stringify(msg)`（抓完整消息结构）
+4. **hibernate handler**：删除 auto-sleep（`deliverAs:"followUp"` 可能 trigger new turn）
+
+### messages.js (dist patch → deploy/patch-pi-dist.js)
+```js
+case "custom": {
+    return {
+        role: "user",
+        content,
+        timestamp: m.timestamp,
+        messageType: m.messageType,  // ← 新增
+    };
+}
+```
+
+## 教训
+1. jiti 缓存：改了 .ts 文件必须改 main.ts 注释强制重编译，否则永远加载旧版
+2. 背压窗口：状态标记不清零是 bug 温床
+3. dist patch 持久化：`npm update -g pi` 会覆盖；用 deploy/apply.js 管理
+4. 不要掩耳盗铃——过滤症状不如追源头

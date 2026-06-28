@@ -1,0 +1,18 @@
+# dist-overrides — pi/pi-ai 的 node_modules 定制（golden 副本）
+
+这些是对 pi 自身 dist（不在 pi-coding-master 扩展里、也没有 TS 源）的改动。`npm i -g pi` 重装会覆盖它们，
+所以把【改好的整文件】存在这里当 golden，`install.sh` 在版本校验（pin 0.79.1）通过后整文件 `cp` 回去。
+
+| golden 文件 | 覆盖到的 dist 路径 | 改了什么 |
+|---|---|---|
+| `footer.js` | `<pi-dist>/modes/interactive/components/footer.js` | $→¥、加真实余额 + ↓¥/min、分 session 花费（主/hc/sc/sl/计）、余额置顶不被截 |
+| `openai-completions.js` | `<pi>/node_modules/@earendil-works/pi-ai/dist/providers/openai-completions.js` | 打断即断流→通知云端停生成（省 abort 隐形烧钱），见 [openai-completions.js.LESSONS](openai-completions.js.LESSONS) |
+| `tool-execution.js` | `<pi-dist>/modes/interactive/components/tool-execution.js` | 通用工具调用标题行显示 summary/title/query 参数，让 wait/contacts/safari 等自定义工具像 edit `~/path` 一样展示有意义的标题 |
+
+## 维护
+
+- **改了行为** → 改 live 的 dist 文件、跑通后，重新 `cp` 回这里覆盖 golden（golden = 真相）。
+- **pi 升级**（换 pin 版本）→ 这些整文件覆盖可能不兼容；install.sh 会跳过并提示手动核对，
+  需在新版 dist 上重做改动、重新存 golden、更新 install.sh 里的 PIN。
+- 为什么用整文件覆盖而不是 .patch：footer 是一连串手改、没有干净的 vanilla diff；整文件 golden 最稳、
+  且与 5 个 git-apply patch 改的文件互不重叠（footer.js / openai-completions.js 都不在那 5 个 patch 范围内）。

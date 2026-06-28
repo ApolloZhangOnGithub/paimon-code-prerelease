@@ -1,0 +1,7 @@
+[2026-06-15] created, by Claude Code
+- RNA 聚合酶：两套解析器(promotor.dna 缩进式声明 + coded.dna 三引号 prompt 块) → 转录成 bios/dnas/rna.json。
+- 补全双向 belong/contain、解析 mode:abled(any/none/列表)、tag 传递闭包、resolve coded:name → 实际 prompt。
+- 校验：未声明 vir 前缀=error / 缺 session·mode=warning / coded 引用不到=error；tag 命名空间内相对 alias 解析。
+[2026-06-16 05:48:33] edited (auto-logged, no messageDescription)
+[2026-06-16 05:48:58] edited (auto-logged, no messageDescription)
+[2026-06-16 05:49:12] edited (auto-logged, no messageDescription)

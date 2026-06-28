@@ -1,0 +1,278 @@
+# agent.macos — TUI 版 macOS
+
+agent 的笔记本电脑。和 technology.phone 是同类——不是控制真实 Mac，是 agent 自己的虚拟 Mac 桌面，纯文本渲染。phone 是手机，laptop 是电脑。
+
+## 定位
+
+phone 是随身设备（通讯、提醒、轻量 app），laptop 是工作站：
+- 文件管理（Finder）
+- 多窗口多任务（Spaces + Window Manager）
+- 系统监控（Activity Monitor）
+- 设置和偏好
+- 搜索（Spotlight）
+- 通知中心
+
+agent 用 `laptop` tool 交互，和 `phone` tool 对等。
+
+## 架构：映射 macOS Aqua
+
+```
+technology.laptop/
+├── system.kernel.darwin/       # 内核：tool 注册、状态机、app 路由
+├── system.kernel.security/     # 权限管理（哪些 app 能访问什么）
+│
+├── system.aqua.dock/           # Dock：显示在跑的 app + 快捷启动
+├── system.aqua.desktop/        # 桌面：默认视图，壁纸+图标
+├── system.aqua.windows/        # 窗口管理器：前台/后台、切换、排列
+├── system.aqua.menubar/        # 菜单栏：时间、电量、网络、app 菜单
+├── system.aqua.spaces/         # 多桌面：工作空间切换
+├── system.aqua.finder/         # Finder：文件浏览
+├── system.aqua.notificationcenter/  # 通知中心
+├── system.aqua.controlcenter/  # 控制中心：音量、亮度、网络开关
+├── system.aqua.spotlight/      # Spotlight 搜索
+│
+├── system.management.settings/ # 系统偏好设置
+├── system.support.icloud/      # iCloud 同步（跨设备记忆同步）
+└── system.utility.activitymonitor/  # 活动监视器：进程、内存、CPU
+```
+
+## 核心概念
+
+### 1. 窗口 vs App
+
+phone 是单 app 全屏（一次只开一个）。laptop 是多窗口：
+- 多个 app 同时运行
+- 前台窗口（当前交互的）
+- 后台窗口（在跑但不看）
+- Cmd+Tab 切换（`laptop switch <app>`）
+
+### 2. 状态模型
+
+```
+LaptopState {
+  desktop: string[];           // 桌面图标（固定 app）
+  dock: DockItem[];            // dock 栏：正在运行的 app + 固定 app
+  windows: Window[];           // 所有打开的窗口
+  foreground: string | null;   // 当前前台窗口的 app 名
+  menubar: MenubarState;       // 菜单栏状态
+  spaces: Space[];             // 多桌面
+  currentSpace: number;        // 当前桌面编号
+}
+
+Window {
+  id: string;
+  app: string;
+  title: string;
+  state: any;                  // app 内部状态
+  minimized: boolean;
+}
+
+DockItem {
+  app: string;
+  running: boolean;            // 下面有没有小圆点
+  pinned: boolean;             // 是否固定在 dock
+}
+```
+
+### 3. 渲染
+
+一次 `laptop` tool 调用返回当前桌面/窗口的文本快照：
+
+```
+═══ macOS Desktop ═══
+
+[menubar] Apple-Watch-Recorder | Finder  File  Edit  View | Wi-Fi ● | 09:30
+
+┌─ Finder: ~/Documents ──────────────────────────┐
+│  projects/    .pi/    notes.md    todo.md       │
+│  > open notes.md                                │
+└─────────────────────────────────────────────────┘
+
+[dock] Finder● | Terminal● | Safari | Settings | Activity Monitor
+       ──────── running ────────── pinned ──────
+
+操作: open <app> | switch <app> | close | minimize | spaces | cmd+tab
+```
+
+### 4. laptop tool 接口
+
+```
+laptop { input: string }
+```
+
+全局命令（任何时候可用）：
+- `open <app>` — 打开/激活 app
+- `close` — 关闭前台窗口
+- `minimize` — 最小化前台窗口
+- `switch <app>` / `cmd+tab` — 切换前台
+- `dock` — 显示 dock
+- `spaces` — 显示所有桌面
+- `space <n>` — 切换到桌面 n
+- `spotlight <query>` — 搜索
+- `notifications` — 通知中心
+- `control` — 控制中心
+- `lock` — 锁屏
+
+在 app 内：输入传给前台 app 的 onAction。
+
+### 5. LaptopApp 接口（不同于 PhoneApp）
+
+PhoneApp 是全屏单页：`onOpen` 返回一屏内容，`onAction` 处理一次输入。够了——手机就是点一下看一下。
+
+LaptopApp 是桌面级应用，能力完全不同：
+
+```typescript
+interface LaptopApp {
+  name: string;
+  icon: string;
+  messageDescription: string;
+
+  // ── 窗口 ──
+  defaultSize?: { width: number; height: number };  // 默认窗口尺寸（字符数）
+  resizable?: boolean;                               // 能否调整大小
+  multiWindow?: boolean;                             // 能否开多个窗口（如 Finder 多个文件夹）
+
+  // ── 菜单栏 ──
+  menubar?: MenuItem[];         // app 激活时在 menubar 显示的菜单
+
+  // ── 生命周期 ──
+  onOpen(state: any, ctx: LaptopContext): { screen: string; state: any };
+  onAction(input: string, state: any, ctx: LaptopContext): { screen: string; state: any };
+  onResize?(width: number, height: number, state: any): { screen: string; state: any };  // 窗口大小变化
+  onBackground?(state: any): void;   // 切到后台时（可以继续跑任务）
+  onForeground?(state: any): { screen: string; state: any };  // 切回前台时刷新
+  onClose?(state: any): void;        // 关闭前清理
+
+  // ── 快捷键 ──
+  shortcuts?: { key: string; action: string; messageDescription: string }[];
+
+  // ── 后台能力 ──
+  backgroundTasks?: boolean;    // 能否后台运行任务（如 Terminal 跑命令）
+  statusItem?: (state: any) => string | null;  // menubar 右侧状态图标（如下载进度）
+}
+
+interface LaptopContext {
+  windowId: string;             // 当前窗口 id
+  width: number;                // 当前窗口宽度
+  height: number;               // 当前窗口高度
+  personDir: string;
+  openWindow(app: string): void;       // 在另一个窗口打开 app
+  sendNotification(title: string, body: string): void;
+}
+
+interface MenuItem {
+  label: string;
+  items: { label: string; shortcut?: string; action: string }[];
+}
+```
+
+### 6. phone vs laptop：设计差异
+
+| | PhoneApp | LaptopApp |
+|---|---|---|
+| 多任务 | 单 app 全屏，切走就暂停 | 多窗口并行，后台继续跑 |
+| 窗口 | 无 | 有尺寸、可调整、可最小化 |
+| 菜单 | 无 | app 菜单栏 + 快捷键 |
+| 渲染 | `onOpen` 返回一整屏 | `onOpen` 返回窗口内容，kernel 画框 |
+| 后台 | 无 | `onBackground` + `backgroundTasks` |
+| 交互深度 | 浅（一问一答） | 深（多 tab、编辑器、面板） |
+| 同一个 app | 轻量版（看今天日程） | 完整版（月视图+编辑+重复事件） |
+| 上下文 | 无 ctx | LaptopContext 提供窗口信息+跨窗口能力 |
+
+同一个"日历"在两个设备上是两套代码。phone 版在 `technology.phone/apps.preinstalled/calendar/`，laptop 版在 `technology.laptop/apps/calendar/`。UI 和交互逻辑完全不同。
+
+数据也是各自独立的。每个设备有自己的沙盒存储，同步通过 iCloud 协议显式完成。
+
+### 7. 设备数据沙盒
+
+```
+~/.pi/memory/<person-id>/.data/
+├── devices/
+│   ├── phone/                    # phone 的沙盒
+│   │   ├── apps/
+│   │   │   ├── calendar.json     # phone 版日历数据
+│   │   │   ├── notes.json        # phone 版备忘录
+│   │   │   ├── reminders.json    # phone 版提醒事项
+│   │   │   └── ...
+│   │   └── system/               # phone 系统数据（通知、设置等）
+│   │
+│   ├── laptop/                   # laptop 的沙盒
+│   │   ├── apps/
+│   │   │   ├── calendar.json     # laptop 版日历数据（更丰富的字段）
+│   │   │   ├── notes/            # laptop 版备忘录（支持文件夹）
+│   │   │   ├── finder-state.json # Finder 状态（最近、收藏夹等）
+│   │   │   └── ...
+│   │   └── system/               # laptop 系统数据
+│   │
+│   └── icloud/                   # iCloud 同步层
+│       ├── sync-log.jsonl        # 同步历史
+│       └── pending/              # 待同步的变更
+```
+
+### 8. iCloud 同步协议
+
+设备之间不读对方的文件。同步流程：
+
+1. App 写本地数据时，同时写一条变更记录到 `devices/<device>/system/changes.jsonl`
+2. iCloud daemon（定期或事件触发）读 changes.jsonl
+3. 把变更转换成目标设备的数据格式，写入 `icloud/pending/<target-device>/<app>.patch`
+4. 目标设备的 kernel 在合适时机（onForeground / 定期）apply pending patches
+
+```typescript
+interface SyncChange {
+  device: "phone" | "laptop";
+  app: string;
+  action: "create" | "update" | "delete";
+  key: string;              // 数据的 id（如日历事件 id）
+  data: any;                // 变更内容
+  ts: number;
+}
+```
+
+这意味着：
+- phone 的日历 app 写 `devices/phone/apps/calendar.json`，不碰 laptop 的
+- laptop 的日历 app 写 `devices/laptop/apps/calendar.json`，不碰 phone 的
+- 两边的数据格式可以不同（phone 版简单，laptop 版丰富）
+- 冲突解决：last-write-wins（按 ts），或 app 自定义合并策略
+
+### 9. 当前 phone 数据迁移
+
+现有 phone app 数据散落在 `~/.pi/memory/<id>/.data/`（如 `reminders.json`、`calendar.json`）。迁移到沙盒：
+- Phase 0：laptop 直接用新路径 `devices/laptop/apps/`
+- Phase 1：phone 数据迁移到 `devices/phone/apps/`，旧路径做 symlink 兼容
+- Phase 2：去掉 symlink，iCloud 同步上线
+
+### 7. 内置 App
+
+Phase 0（最小可用）：
+- Finder — 文件浏览 + 预览
+- Terminal — 就是现有的 execute tool 的包装
+- Activity Monitor — tmux sessions + 进程列表 + 内存/CPU
+- Settings — 模型配置、记忆参数、通知偏好
+
+Phase 1：
+- Notes — 同步 phone 的备忘录
+- Calendar — 同步 phone 的日历
+- Safari — 同步 phone 的 Safari（共享 session）
+
+Phase 2：
+- Spotlight — 跨 app 搜索（文件+记忆+通知+日历）
+- iCloud — phone/laptop 状态同步
+
+## 和现有系统的关系
+
+- kernel.ts 在 heart.kernel 里注册 `laptop` tool，和 `phone` tool 并列
+- laptop app 的 auto-discovery 和 phone 一样——扫描 apps.* 目录
+- laptop 和 phone 共享一些 app 的数据（日历、备忘录、通讯录）但 UI 不同
+- laptop 的 Finder 读的是 agent 的真实文件系统（~/.pi/memory/ 等）
+
+## 实现顺序
+
+1. kernel.darwin — 注册 laptop tool、状态机、app 路由、dock 管理
+2. aqua.dock — dock 渲染 + 运行状态追踪
+3. aqua.desktop — 桌面渲染
+4. aqua.windows — 多窗口管理
+5. aqua.finder — 文件浏览
+6. utility.activitymonitor — 进程/资源监控
+7. management.settings — 配置面板
+8. aqua.menubar + aqua.spotlight + aqua.notificationcenter

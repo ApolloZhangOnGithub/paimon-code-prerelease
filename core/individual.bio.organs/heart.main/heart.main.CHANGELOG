@@ -1,0 +1,43 @@
+# unstop changelog
+
+## v0.2.6
+- fix: timestamps 从 context 改成 message_end + return { message } 正确替换，只打 user/toolResult
+- fix: timeout 从 bash schema 彻底移除（createBashTool override，不只是 strip input）
+- feat: run 工具恢复（v0.2.3 删了，v0.2.5 没加回来）
+- fix: 所有 timer 回调加 try-catch 防 stale ctx 崩溃
+- fix: session_shutdown 时清所有 timer
+- feat: conscious 扩展——潜意识 session（后台反刍 + aware + read_conscious）
+- feat: /conscious 命令打开全屏面板查看潜意识消息流
+- feat: aware 消息自定义渲染（┊ [subconscious] 样式）
+- feat: wise-file 建议 spec 里加用户原话
+
+## v0.2.5
+- fix: bash tool_call 拦截导致所有命令 exit 1，删掉自动后台拦截
+- fix: timestamps 重复打戳，改用 WeakSet
+- fix: wait_for_user 后用户说话状态栏卡住
+
+## v0.2.4
+- feat: 单 Esc = 暂停，双 Esc = 真停
+
+## v0.2.3
+- feat: bash 超 1s 自动转后台（有 bug，v0.2.5 回滚）
+
+## v0.2.2
+- feat: 模块化（stop.ts / process.ts），每个模块自带 prompt
+- feat: run + process_control + /monitor
+
+## v0.2.1
+- feat: agent_stop 三态 + 时间限制
+- fix: Esc aborted 不再重启
+
+## v0.2.0
+- feat: 纯扩展方案
+
+## v0.2.7
+- fix: unstop-continue 用 setTimeout(0) 包裹 sendMessage，避免 agent_end handler 里 fire-and-forget + isTriggerNewTurn 导致的竞态条件（agent 提前 idle，_runAgentPrompt 异步滞后）
+- feat: agent_stop → wait (重命名，语义更清晰)
+- feat: 新增 hibernate 工具（永久休眠，关闭连续模式，等于 terminal stop）
+- chore: 全局 agent_stop 引用清理（process.ts PROMPT、conscious/prompt.ts 等）
+
+## v0.1.0
+- 改 dist（废弃）

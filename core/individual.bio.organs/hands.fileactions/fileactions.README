@@ -1,0 +1,12 @@
+替代 wise-edit.ts。文件操作全流程追踪扩展。
+
+规则：
+- write 前必须有 .SPEC
+- edit 必须写 .CHANGELOG（只增不减）
+- write 完必须有 .README
+- bash mv 同目录（rename）必须有 .NAMETRACE
+- bash mv 跨目录（move）必须有 .LOCATIONTRACE
+- rename/move 后伴生文件自动跟着
+- 伴生文件自身（.SPEC/.CHANGELOG/.NAMETRACE/.LOCATIONTRACE）豁免所有规则
+
+详细设计见 Smart Claude/pi/WISE_FILE_SPEC.md
