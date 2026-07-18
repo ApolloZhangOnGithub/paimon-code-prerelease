@@ -1,0 +1,1 @@
+/deploy目录主要为配合Makefile的一些文件。开发者如果无需修改Makefile，则无需关注该目录。

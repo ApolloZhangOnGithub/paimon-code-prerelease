@@ -1,0 +1,11 @@
+{
+  "name": "paimon-code",
+  "version": "0.2.9",
+  "description": "Living AI agent extension for pi-coding-agent",
+  "license": "MIT",
+  "os": ["darwin", "linux"],
+  "engines": { "node": ">=18" },
+  "dependencies": { "@earendil-works/pi-coding-agent": "0.80.7" },
+  "scripts": { "postinstall": "PAIMON_CHANNEL=release PAIMON_VER=0.2.9 bash deploy/install.sh" },
+  "files": ["core/", "deploy/", "README.md"]
+}

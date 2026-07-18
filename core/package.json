@@ -1,0 +1,38 @@
+{
+  "name": "paimon-code",
+  "version": "0.3.0-dev",
+  "type": "module",
+  "//": "路径别名总表(唯一真相源)。所有跨模块 import 用 #别名,文件随便移——只改这里这一行。Node 原生 imports 字段,运行时解析,不用打包器。",
+  "imports": {
+    "#paths": "./paths.ts",
+    "#kernel_core": "./individual.bio.organs/kernel.core/core.ts",
+    "#kernel_heart": "./individual.bio.organs/kernel.heart/heart.ts",
+    "#kernel_backbone": "./individual.bio.organs/kernel.backbone/backbone.ts",
+    "#hands_execute": "./individual.bio.organs/hands.execute/execute.ts",
+    "#hands_terminal": "./individual.bio.organs/hands.terminal/terminal.ts",
+    "#hands_fileactions": "./individual.bio.organs/hands.fileactions/fileactions.ts",
+    "#ear": "./individual.bio.organs/ears.listen/listen.ts",
+    "#mouth": "./individual.bio.organs/mouth.speak/speak.ts",
+    "#ribosome": "./individual.bio.organs/cells.ribosome/ribosome.ts",
+    "#transpiler": "./individual.bio.gene/transpiler.ts",
+    "#tui_blockrender": "./god.tui/ui/blockrender.js",
+    "#technology_mobile": "./technology.local.mobile/system.kernel/kernel.ts",
+    "#technology_laptop": "./technology.local.laptop/system.kernel/kernel.ts",
+    "#sensitiveactions": "./individual.bio.organs/hands.sensitive/sensitive.ts",
+    "#brain_metaconsciousness": "./individual.bio.organs/brain.metaconsciousness/metaconsciousness.ts",
+    "#brain_hippocampus": "./individual.bio.organs/brain.hippocampus/hippocampus.ts",
+    "#brain_bioclock": "./individual.bio.organs/brain.bioclock/bioclock.ts",
+    "#world_space": "./world.engine.USTCS/Universe Space Teleport & Creation System/space.ts",
+    "#world_organization": "./world.society/organization/organization.ts",
+    "#identity": "./individual.abio.identity/identity.ts",
+    "#status": "./individual.abio.status/status.ts"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
+    "wrap-ansi": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
+  }
+}
